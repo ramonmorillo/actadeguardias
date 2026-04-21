@@ -160,3 +160,32 @@ function marcarConAdjuntos(incidenciaId) {
     setCellValue(CONFIG.SHEETS.INCIDENCIAS, result.rowIndex, COLS.INCIDENCIAS.TIENE_ADJUNTOS, true);
   }
 }
+
+// ── Eliminar ───────────────────────────────────────────────────────────────
+
+/**
+ * Elimina una incidencia y sus adjuntos asociados (solo admin).
+ * Los archivos de Drive se mueven a la papelera.
+ */
+function deleteIncidencia(token, id) {
+  try {
+    requireAdminPermission(token);
+    var result = findRow(CONFIG.SHEETS.INCIDENCIAS, COLS.INCIDENCIAS.ID, id);
+    if (!result) throw new Error('Incidencia no encontrada.');
+
+    // Eliminar adjuntos en Drive y en la hoja (recorrido inverso para evitar desplazamiento de filas)
+    var adjData = getAllRaw(CONFIG.SHEETS.ADJUNTOS);
+    for (var i = adjData.length - 1; i >= 1; i--) {
+      if (adjData[i][COLS.ADJUNTOS.ID_INCIDENCIA] === id && adjData[i][COLS.ADJUNTOS.ID]) {
+        try { DriveApp.getFileById(adjData[i][COLS.ADJUNTOS.ID_DRIVE]).setTrashed(true); } catch (e) {}
+        deleteRowByIndex(CONFIG.SHEETS.ADJUNTOS, i + 1);
+      }
+    }
+
+    deleteRowByIndex(CONFIG.SHEETS.INCIDENCIAS, result.rowIndex);
+    return ok(null, 'Incidencia eliminada correctamente.');
+  } catch (e) {
+    logErr('deleteIncidencia', e);
+    return fail(e.message);
+  }
+}

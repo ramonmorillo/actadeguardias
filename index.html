@@ -403,6 +403,9 @@
         <button class="btn btn-outline-warning btn-sm" id="btn-reabrir-parte" onclick="reabrirParte()" style="display:none;">
           <i class="bi bi-lock-fill me-1"></i>Reabrir parte
         </button>
+        <button class="btn btn-outline-secondary btn-sm" onclick="imprimirParte()">
+          <i class="bi bi-printer me-1"></i>Imprimir
+        </button>
         <button class="btn btn-outline-secondary btn-sm" onclick="duplicarParte()">
           <i class="bi bi-copy me-1"></i>Duplicar
         </button>
@@ -1663,8 +1666,12 @@ function renderIncidencias() {
   cont.innerHTML = lista.map(function(inc) {
     var prioClass = 'prio-' + (inc.prioridad||'media').replace('í','i');
 
+    var isAdmin = APP.user && APP.user.rol === 'admin';
     var acciones = canEdit
       ? '<button class="btn btn-outline-secondary btn-sm py-0" onclick="abrirModalIncidencia(\'' + inc.id + '\')" title="Editar"><i class="bi bi-pencil"></i></button>' +
+        (isAdmin
+          ? ' <button class="btn btn-outline-danger btn-sm py-0" onclick="eliminarIncidencia(\'' + inc.id + '\')" title="Eliminar (admin)"><i class="bi bi-trash3"></i></button>'
+          : '') +
         '<select class="form-select form-select-sm mt-1" style="font-size:.72rem;padding:.15rem .4rem;" ' +
           'onchange="cambiarEstadoIncidencia(\'' + inc.id + '\', this.value)" title="Cambiar estado">' +
           estadosOpts.map(function(e) {
@@ -1700,10 +1707,30 @@ function renderIncidencias() {
 
 function cambiarEstadoIncidencia(incId, nuevoEstado) {
   llamarW('updateEstadoIncidencia', [incId, nuevoEstado], null, function() {
-    // Actualiza la caché local para evitar un re-fetch completo
     var inc = APP.parteIncidencias.find(function(i){ return i.id === incId; });
     if (inc) inc.estado = nuevoEstado;
     toast('Estado actualizado: ' + nuevoEstado, 'success');
+  });
+}
+
+function eliminarIncidencia(incId) {
+  confirmar('Eliminar incidencia',
+    '¿Eliminar definitivamente esta incidencia y sus adjuntos? Esta acción no se puede deshacer.',
+    function() {
+      llamarW('deleteIncidencia', [incId], 'Eliminando…', function(_, msg) {
+        toast(msg || 'Incidencia eliminada.', 'success');
+        APP.parteIncidencias = APP.parteIncidencias.filter(function(i){ return i.id !== incId; });
+        renderIncidencias();
+      });
+    });
+}
+
+function imprimirParte() {
+  llamar('getParteHTML', [APP.currentParteId], 'Preparando…', function(res) {
+    var win = window.open('', '_blank');
+    win.document.write(res.html);
+    win.document.close();
+    setTimeout(function() { win.print(); }, 500);
   });
 }
 
