@@ -5,7 +5,7 @@
 
 var HEADERS = {
   CONFIG:      ['Clave', 'Valor', 'Descripcion'],
-  USUARIOS:    ['Email', 'Nombre', 'Rol', 'Activo', 'FechaAlta'],
+  USUARIOS:    ['Email', 'Nombre', 'Rol', 'Activo', 'Password', 'FechaAlta'],
   PARTES:      ['ID', 'FechaInicio', 'FechaFin', 'TipoPeriodo', 'Profesionales',
                 'CreadoPor', 'FechaCreacion', 'UltimaModificacion', 'ModificadoPor',
                 'Estado', 'Observaciones'],
@@ -82,12 +82,25 @@ function addSampleData() {
 function addSampleUsuarios(ss) {
   var sheet = ss.getSheetByName(CONFIG.SHEETS.USUARIOS);
   if (sheet.getLastRow() > 1) return;
-  sheet.getRange(2, 1, 4, 5).setValues([
-    ['admin@farmacia.es',          'Administrador Farmacia',  'admin',  true, new Date()],
-    ['farmaceutico1@farmacia.es',  'Ana García López',        'editor', true, new Date()],
-    ['farmaceutico2@farmacia.es',  'Carlos Martínez Ruiz',   'editor', true, new Date()],
-    ['tecnico1@farmacia.es',       'María Fernández Díaz',   'lector', true, new Date()]
+  // Columnas: Email, Nombre, Rol, Activo, Password, FechaAlta
+  // AVISO: contraseñas en texto plano solo para demo. Cambiarlas en producción.
+  sheet.getRange(2, 1, 4, 6).setValues([
+    ['admin@farmacia.es',         'Administrador Farmacia', 'admin',  true, 'Admin1234',   new Date()],
+    ['farmaceutico1@farmacia.es', 'Ana García López',       'editor', true, 'Farmacia1',   new Date()],
+    ['farmaceutico2@farmacia.es', 'Carlos Martínez Ruiz',  'editor', true, 'Farmacia2',   new Date()],
+    ['tecnico1@farmacia.es',      'María Fernández Díaz',  'lector', true, 'Tecnico1',    new Date()]
   ]);
+}
+
+/**
+ * Utilidad para añadir o actualizar la contraseña de un usuario desde el editor.
+ * Ejecutar manualmente desde el editor de Apps Script si hace falta resetear.
+ */
+function resetearPasswordManual(email, nuevaPassword) {
+  var result = findRow(CONFIG.SHEETS.USUARIOS, COLS.USUARIOS.EMAIL, email.toLowerCase());
+  if (!result) throw new Error('Usuario no encontrado: ' + email);
+  setCellValue(CONFIG.SHEETS.USUARIOS, result.rowIndex, COLS.USUARIOS.PASSWORD, nuevaPassword);
+  console.log('Contraseña actualizada para: ' + email);
 }
 
 function addSamplePartes(ss) {

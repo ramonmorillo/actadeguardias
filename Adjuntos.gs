@@ -41,16 +41,17 @@ function rowToAdjunto(row) {
 
 /**
  * Sube un archivo a Drive y lo registra en la hoja Adjuntos.
+ * @param {string} token       Token de sesión.
  * @param {string} incidenciaId
  * @param {string} parteId
  * @param {string} fileName
  * @param {string} base64Data  Contenido del archivo en base64 (sin prefijo data:…)
  * @param {string} mimeType
  */
-function uploadAdjunto(incidenciaId, parteId, fileName, base64Data, mimeType) {
+function uploadAdjunto(token, incidenciaId, parteId, fileName, base64Data, mimeType) {
   try {
-    requireEditPermission();
-    var email = getCurrentUser();
+    var user  = requireEditPermission(token);
+    var email = user.email;
 
     if (!base64Data || base64Data.length < 4) throw new Error('El archivo está vacío.');
 
@@ -132,9 +133,9 @@ function getAdjuntosByParte(parteId) {
 
 // ── Eliminar ───────────────────────────────────────────────────────────────
 
-function deleteAdjunto(id) {
+function deleteAdjunto(token, id) {
   try {
-    requireEditPermission();
+    requireEditPermission(token);
     var result = findRow(CONFIG.SHEETS.ADJUNTOS, COLS.ADJUNTOS.ID, id);
     if (!result) throw new Error('Adjunto no encontrado.');
 

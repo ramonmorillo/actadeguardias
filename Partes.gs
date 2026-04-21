@@ -1,5 +1,6 @@
 /**
  * CRUD de Partes de Guardia.
+ * Todas las funciones de escritura reciben el token de sesión como primer parámetro.
  */
 
 // ── Mapper fila → objeto ───────────────────────────────────────────────────
@@ -20,25 +21,11 @@ function rowToParte(row) {
   };
 }
 
-function parteToRow(id, data, email, now) {
-  return [
-    id,
-    data.fechaInicio  ? new Date(data.fechaInicio)  : new Date(),
-    data.fechaFin     ? new Date(data.fechaFin)     : new Date(),
-    data.tipoPeriodo  || 'Fin de semana',
-    data.profesionales || '',
-    email, now, now, email,
-    data.estado       || CONFIG.ESTADOS_PARTE.BORRADOR,
-    data.observaciones || ''
-  ];
-}
-
 // ── Crear ──────────────────────────────────────────────────────────────────
 
-function createParte(data) {
+function createParte(token, data) {
   try {
-    requireEditPermission();
-    var email = getCurrentUser();
+    var user = requireEditPermission(token);
     requireField(data.fechaInicio,  'Fecha de inicio');
     requireField(data.fechaFin,     'Fecha de fin');
     requireField(data.tipoPeriodo,  'Tipo de periodo');
@@ -49,7 +36,16 @@ function createParte(data) {
 
     var id  = generateId('PG');
     var now = new Date();
-    appendRow(CONFIG.SHEETS.PARTES, parteToRow(id, data, email, now));
+    appendRow(CONFIG.SHEETS.PARTES, [
+      id,
+      new Date(data.fechaInicio),
+      new Date(data.fechaFin),
+      data.tipoPeriodo,
+      data.profesionales || '',
+      user.email, now, now, user.email,
+      data.estado || CONFIG.ESTADOS_PARTE.BORRADOR,
+      data.observaciones || ''
+    ]);
     return ok({ id: id }, 'Parte creado correctamente.');
   } catch (e) {
     logErr('createParte', e);
@@ -57,7 +53,7 @@ function createParte(data) {
   }
 }
 
-// ── Leer ───────────────────────────────────────────────────────────────────
+// ── Leer (sin autenticación requerida — datos internos no sensibles) ───────
 
 function getParte(id) {
   try {
@@ -95,9 +91,9 @@ function getParteConIncidencias(id) {
     var inc = listIncidenciasByParte(id);
     var adj = getAdjuntosByParte(id);
     return ok({
-      parte:      p.data,
+      parte:       p.data,
       incidencias: inc.success ? inc.data : [],
-      adjuntos:   adj.success ? adj.data : []
+      adjuntos:    adj.success ? adj.data : []
     });
   } catch (e) {
     logErr('getParteConIncidencias', e);
@@ -107,14 +103,14 @@ function getParteConIncidencias(id) {
 
 // ── Actualizar ─────────────────────────────────────────────────────────────
 
-function updateParte(id, data) {
+function updateParte(token, id, data) {
   try {
-    requireEditPermission();
-    var email  = getCurrentUser();
+    var user   = requireEditPermission(token);
     var result = findRow(CONFIG.SHEETS.PARTES, COLS.PARTES.ID, id);
     if (!result) throw new Error('Parte no encontrado.');
 
-    if (result.row[COLS.PARTES.ESTADO] === CONFIG.ESTADOS_PARTE.CERRADO && !isAdmin(email)) {
+    if (result.row[COLS.PARTES.ESTADO] === CONFIG.ESTADOS_PARTE.CERRADO &&
+        user.rol !== CONFIG.ROLES.ADMIN) {
       throw new Error('El parte está cerrado. Solo un administrador puede modificarlo.');
     }
 
@@ -127,7 +123,7 @@ function updateParte(id, data) {
     if (data.estado       !== undefined) row[COLS.PARTES.ESTADO]        = data.estado;
 
     row[COLS.PARTES.ULTIMA_MODIFICACION] = new Date();
-    row[COLS.PARTES.MODIFICADO_POR]      = email;
+    row[COLS.PARTES.MODIFICADO_POR]      = user.email;
 
     updateRow(CONFIG.SHEETS.PARTES, result.rowIndex, row);
     return ok({ id: id }, 'Parte actualizado.');
@@ -137,14 +133,14 @@ function updateParte(id, data) {
   }
 }
 
-function closeParte(id) {
-  return updateParte(id, { estado: CONFIG.ESTADOS_PARTE.CERRADO });
+function closeParte(token, id) {
+  return updateParte(token, id, { estado: CONFIG.ESTADOS_PARTE.CERRADO });
 }
 
-function reopenParte(id) {
+function reopenParte(token, id) {
   try {
-    if (!isAdmin(getCurrentUser())) throw new Error('Solo administradores pueden reabrir partes.');
-    return updateParte(id, { estado: CONFIG.ESTADOS_PARTE.BORRADOR });
+    requireAdminPermission(token);
+    return updateParte(token, id, { estado: CONFIG.ESTADOS_PARTE.BORRADOR });
   } catch (e) {
     logErr('reopenParte', e);
     return fail(e.message);
@@ -153,12 +149,12 @@ function reopenParte(id) {
 
 // ── Duplicar ───────────────────────────────────────────────────────────────
 
-function duplicateParte(id) {
+function duplicateParte(token, id) {
   try {
-    requireEditPermission();
+    requireEditPermission(token);
     var p = getParte(id);
     if (!p.success) return p;
-    return createParte({
+    return createParte(token, {
       fechaInicio:   p.data.fechaInicio,
       fechaFin:      p.data.fechaFin,
       tipoPeriodo:   p.data.tipoPeriodo,

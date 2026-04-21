@@ -120,10 +120,50 @@
       #main-content { padding: .75rem; }
       .kpi-num { font-size: 1.4rem; }
     }
+
+    /* ── Login overlay ── */
+    #login-overlay {
+      position: fixed; inset: 0; background: var(--gris-bg);
+      z-index: 20000; display: flex; align-items: center; justify-content: center;
+    }
+    #login-overlay.hidden { display: none; }
+    .login-box {
+      background: #fff; border: 1px solid var(--borde); border-radius: 12px;
+      padding: 2.5rem 2rem; width: 100%; max-width: 400px;
+      box-shadow: 0 4px 24px rgba(0,0,0,.10);
+    }
+    .login-box .login-logo { font-size: 2rem; color: var(--azul); }
   </style>
 </head>
 
 <body>
+
+<!-- ╔══════════════════════════════════════════════════════╗
+     ║  LOGIN OVERLAY                                       ║
+     ╚══════════════════════════════════════════════════════╝ -->
+<div id="login-overlay">
+  <div class="login-box text-center">
+    <div class="login-logo mb-2"><i class="bi bi-capsule"></i></div>
+    <h5 class="fw-bold mb-1">Guardias · Farmacia</h5>
+    <p class="text-muted small mb-4">Acceso con usuario corporativo</p>
+    <div class="text-start">
+      <div class="mb-3">
+        <label class="form-label fw-semibold" for="login-email">Email</label>
+        <input type="email" class="form-control" id="login-email" placeholder="usuario@farmacia.es"
+               autocomplete="username" onkeydown="if(event.key==='Enter')document.getElementById('login-pass').focus()">
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-semibold" for="login-pass">Contraseña</label>
+        <input type="password" class="form-control" id="login-pass"
+               autocomplete="current-password" onkeydown="if(event.key==='Enter')hacerLogin()">
+      </div>
+      <div id="login-error" class="alert alert-danger py-2 small mb-3" style="display:none;"></div>
+      <button class="btn btn-primary w-100" onclick="hacerLogin()">
+        <i class="bi bi-box-arrow-in-right me-1"></i>Entrar
+      </button>
+    </div>
+  </div>
+</div>
 
 <!-- ╔══════════════════════════════════════════════════════╗
      ║  NAVBAR                                              ║
@@ -164,10 +204,18 @@
           </a>
         </li>
       </ul>
-      <span class="navbar-text me-3" id="user-badge" style="font-size:.82rem;opacity:.85;">
-        <i class="bi bi-person-circle me-1"></i><span id="user-name">…</span>
-        <span id="user-rol" class="badge bg-light text-dark ms-1" style="font-size:.7rem;"></span>
-      </span>
+      <div class="d-flex align-items-center gap-2 ms-auto">
+        <span class="navbar-text" style="font-size:.82rem;opacity:.85;">
+          <i class="bi bi-person-circle me-1"></i><span id="user-name">…</span>
+          <span id="user-rol" class="badge bg-light text-dark ms-1" style="font-size:.7rem;"></span>
+        </span>
+        <button class="btn btn-outline-light btn-sm" title="Cambiar contraseña" onclick="abrirModalPassword()">
+          <i class="bi bi-key"></i>
+        </button>
+        <button class="btn btn-outline-light btn-sm" title="Cerrar sesión" onclick="hacerLogout()">
+          <i class="bi bi-box-arrow-right"></i>
+        </button>
+      </div>
     </div>
   </div>
 </nav>
@@ -978,6 +1026,40 @@
   </div>
 </div>
 
+<!-- ╔══════════════════════════════════════════════════════╗
+     ║  MODAL — CAMBIO DE CONTRASEÑA                        ║
+     ╚══════════════════════════════════════════════════════╝ -->
+<div class="modal fade" id="modalPassword" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-sm modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title"><i class="bi bi-key me-1"></i>Cambiar contraseña</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="pwd-admin-row" class="mb-3" style="display:none;">
+          <label class="form-label fw-semibold" style="font-size:.85rem;">Email del usuario <span class="text-muted small">(admin)</span></label>
+          <input type="email" class="form-control form-control-sm" id="pwd-target-email" placeholder="usuario@farmacia.es">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold" style="font-size:.85rem;">Nueva contraseña</label>
+          <input type="password" class="form-control form-control-sm" id="pwd-nueva" placeholder="Mínimo 4 caracteres">
+        </div>
+        <div class="mb-0">
+          <label class="form-label fw-semibold" style="font-size:.85rem;">Repetir contraseña</label>
+          <input type="password" class="form-control form-control-sm" id="pwd-repite">
+        </div>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-primary btn-sm" onclick="guardarPassword()">
+          <i class="bi bi-floppy me-1"></i>Guardar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ── SPINNER OVERLAY ────────────────────────────────── -->
 <div id="spinner-overlay">
   <div class="text-center">
@@ -1000,17 +1082,19 @@
 // ══════════════════════════════════════════════════════
 var APP = {
   user:            null,   // { email, nombre, rol }
-  catalogos:       null,   // { Area:[…], TipoEntrada:[…], … }
+  token:           null,   // token de sesión interna
+  catalogos:       null,
   currentParteId:  null,
   currentIncId:    null,
-  parteIncidencias:[],     // caché de incidencias del parte activo
+  parteIncidencias:[],
   bqPage:          1,
   informeData:     null,
   charts:          {},
-  histAllPartes:   [],     // caché lista partes
-  modalParteInst:  null,
-  modalIncInst:    null,
-  modalConfirmInst:null
+  histAllPartes:   [],
+  modalParteInst:   null,
+  modalIncInst:     null,
+  modalConfirmInst: null,
+  modalPasswordInst:null
 };
 
 // ══════════════════════════════════════════════════════
@@ -1158,29 +1242,93 @@ function llamar(fnName, args, spinnerMsg, onSuccess, onError) {
   }
 }
 
+// Llamada autenticada: prepende APP.token como primer argumento
+function llamarW(fnName, args, spinnerMsg, onSuccess, onError) {
+  llamar(fnName, [APP.token].concat(args || []), spinnerMsg, onSuccess, onError);
+}
+
 // ══════════════════════════════════════════════════════
 //  INICIALIZACIÓN
 // ══════════════════════════════════════════════════════
 
 window.addEventListener('load', function() {
-  // Instanciar modales Bootstrap
-  APP.modalParteInst   = new bootstrap.Modal(document.getElementById('modalParte'));
-  APP.modalIncInst     = new bootstrap.Modal(document.getElementById('modalIncidencia'));
-  APP.modalConfirmInst = new bootstrap.Modal(document.getElementById('modalConfirm'));
+  APP.modalParteInst    = new bootstrap.Modal(document.getElementById('modalParte'));
+  APP.modalIncInst      = new bootstrap.Modal(document.getElementById('modalIncidencia'));
+  APP.modalConfirmInst  = new bootstrap.Modal(document.getElementById('modalConfirm'));
+  APP.modalPasswordInst = new bootstrap.Modal(document.getElementById('modalPassword'));
 
-  // Cargar usuario e info inicial
-  llamar('getCurrentUserInfo', [], 'Iniciando…', function(user) {
-    APP.user = user;
-    document.getElementById('user-name').textContent = user.nombre || user.email;
-    document.getElementById('user-rol').textContent  = user.rol;
-
-    llamar('getCatalogos', [], null, function(cat) {
-      APP.catalogos = cat;
-      poblarSelectoresCatalogos();
-      showView('dashboard');
+  // Intenta restaurar sesión guardada
+  var savedToken = sessionStorage.getItem('gf_token');
+  if (savedToken) {
+    showSpinner('Verificando sesión…');
+    llamar('getCurrentUserInfo', [savedToken], null, function(user) {
+      hideSpinner();
+      APP.token = savedToken;
+      iniciarApp(user);
+    }, function() {
+      hideSpinner();
+      sessionStorage.removeItem('gf_token');
+      mostrarLogin();
     });
-  });
+  } else {
+    mostrarLogin();
+  }
 });
+
+function mostrarLogin() {
+  document.getElementById('login-overlay').classList.remove('hidden');
+  setTimeout(function(){ document.getElementById('login-email').focus(); }, 100);
+}
+
+function hacerLogin() {
+  var email = document.getElementById('login-email').value.trim().toLowerCase();
+  var pass  = document.getElementById('login-pass').value;
+  var errEl = document.getElementById('login-error');
+  errEl.style.display = 'none';
+
+  if (!email || !pass) {
+    errEl.textContent = 'Introduce tu email y contraseña.';
+    errEl.style.display = '';
+    return;
+  }
+
+  showSpinner('Iniciando sesión…');
+  llamar('loginUsuario', [email, pass], null, function(data) {
+    hideSpinner();
+    APP.token = data.token;
+    sessionStorage.setItem('gf_token', data.token);
+    document.getElementById('login-pass').value = '';
+    document.getElementById('login-overlay').classList.add('hidden');
+    iniciarApp(data.user);
+  }, function(msg) {
+    hideSpinner();
+    errEl.textContent = msg || 'Credenciales incorrectas.';
+    errEl.style.display = '';
+  });
+}
+
+function hacerLogout() {
+  if (APP.token) {
+    llamar('logoutUsuario', [APP.token], null, function() {}, function() {});
+  }
+  APP.token = null;
+  APP.user  = null;
+  sessionStorage.removeItem('gf_token');
+  document.getElementById('login-email').value = '';
+  document.getElementById('login-pass').value  = '';
+  mostrarLogin();
+}
+
+function iniciarApp(user) {
+  APP.user = user;
+  document.getElementById('user-name').textContent = user.nombre || user.email;
+  document.getElementById('user-rol').textContent  = user.rol;
+  llamar('getCatalogos', [], null, function(cat) {
+    APP.catalogos = cat;
+    poblarSelectoresCatalogos();
+    showView('dashboard');
+  });
+}
 
 function poblarSelectoresCatalogos() {
   var cat = APP.catalogos || {};
@@ -1203,6 +1351,35 @@ function poblarSelectoresCatalogos() {
   llenarSelect('hist-filtro-tipo', tper);
   // Filtros vista parte
   llenarSelect('inc-filtro-area', areas);
+}
+
+function abrirModalPassword() {
+  document.getElementById('pwd-nueva').value   = '';
+  document.getElementById('pwd-repite').value  = '';
+  var isAdmin = APP.user && APP.user.rol === 'admin';
+  var adminRow = document.getElementById('pwd-admin-row');
+  adminRow.style.display = isAdmin ? '' : 'none';
+  if (isAdmin) {
+    document.getElementById('pwd-target-email').value = '';
+  }
+  APP.modalPasswordInst.show();
+}
+
+function guardarPassword() {
+  var nueva  = document.getElementById('pwd-nueva').value;
+  var repite = document.getElementById('pwd-repite').value;
+  if (!nueva || nueva.length < 4) { toast('La contraseña debe tener al menos 4 caracteres.', 'warning'); return; }
+  if (nueva !== repite)           { toast('Las contraseñas no coinciden.', 'warning'); return; }
+
+  var isAdmin = APP.user && APP.user.rol === 'admin';
+  var targetEmail = isAdmin
+    ? (document.getElementById('pwd-target-email').value.trim().toLowerCase() || APP.user.email)
+    : APP.user.email;
+
+  llamarW('cambiarPassword', [targetEmail, nueva], 'Guardando…', function(_, msg) {
+    APP.modalPasswordInst.hide();
+    toast(msg || 'Contraseña actualizada.', 'success');
+  });
 }
 
 </script>
@@ -1423,7 +1600,7 @@ function escHtml(s) {
 
 function cerrarParte() {
   confirmar('Cerrar parte', '¿Cerrar este parte? No podrá ser editado por usuarios no administradores.', function() {
-    llamar('closeParte', [APP.currentParteId], 'Cerrando…', function() {
+    llamarW('closeParte', [APP.currentParteId], 'Cerrando…', function() {
       toast('Parte cerrado correctamente.', 'success');
       abrirParte(APP.currentParteId);
     });
@@ -1432,7 +1609,7 @@ function cerrarParte() {
 
 function duplicarParte() {
   confirmar('Duplicar parte', '¿Crear un nuevo parte copiando los datos de éste?', function() {
-    llamar('duplicateParte', [APP.currentParteId], 'Duplicando…', function(data) {
+    llamarW('duplicateParte', [APP.currentParteId], 'Duplicando…', function(data) {
       toast('Parte duplicado: ' + data.id, 'success');
       abrirParte(data.id);
     });
@@ -1441,7 +1618,7 @@ function duplicarParte() {
 
 function confirmarCerrarParte(id) {
   confirmar('Cerrar parte', '¿Cerrar el parte ' + id + '?', function() {
-    llamar('closeParte', [id], 'Cerrando…', function() {
+    llamarW('closeParte', [id], 'Cerrando…', function() {
       toast('Parte ' + id + ' cerrado.', 'success');
       cargarHistorico();
     });
@@ -1450,7 +1627,7 @@ function confirmarCerrarParte(id) {
 
 function confirmarDuplicar(id) {
   confirmar('Duplicar parte', '¿Crear un nuevo parte copiando ' + id + '?', function() {
-    llamar('duplicateParte', [id], 'Duplicando…', function(data) {
+    llamarW('duplicateParte', [id], 'Duplicando…', function(data) {
       toast('Parte duplicado: ' + data.id, 'success');
       abrirParte(data.id);
     });
@@ -1527,14 +1704,14 @@ function guardarParte() {
   };
 
   if (id) {
-    llamar('updateParte', [id, data], 'Guardando…', function(res, msg) {
+    llamarW('updateParte', [id, data], 'Guardando…', function(res, msg) {
       APP.modalParteInst.hide();
       toast(msg || 'Parte actualizado.', 'success');
       if (APP.currentParteId === id) abrirParte(id);
       else cargarHistorico();
     });
   } else {
-    llamar('createParte', [data], 'Creando parte…', function(res, msg) {
+    llamarW('createParte', [data], 'Creando parte…', function(res, msg) {
       APP.modalParteInst.hide();
       toast(msg || 'Parte creado.', 'success');
       abrirParte(res.id);
@@ -1658,9 +1835,9 @@ function guardarIncidencia() {
   };
 
   if (id) {
-    llamar('updateIncidencia', [id, data], 'Guardando…', onDone);
+    llamarW('updateIncidencia', [id, data], 'Guardando…', onDone);
   } else {
-    llamar('createIncidencia', [data], 'Registrando incidencia…', onDone);
+    llamarW('createIncidencia', [data], 'Registrando incidencia…', onDone);
   }
 }
 
@@ -1700,7 +1877,7 @@ function subirAdjunto() {
   var reader = new FileReader();
   reader.onload = function(e) {
     var b64 = e.target.result.split(',')[1];
-    llamar('uploadAdjunto', [incId, parteId, file.name, b64, file.type],
+    llamarW('uploadAdjunto', [incId, parteId, file.name, b64, file.type],
       'Subiendo archivo…', function(res, msg) {
         toast(msg || 'Archivo subido.', 'success');
         input.value = '';
@@ -1714,7 +1891,7 @@ function subirAdjunto() {
 function eliminarAdjunto(adjId) {
   confirmar('Eliminar adjunto', '¿Eliminar este adjunto? También se moverá a la papelera de Drive.', function() {
     var incId = document.getElementById('mi-id').value.trim();
-    llamar('deleteAdjunto', [adjId], 'Eliminando…', function(_, msg) {
+    llamarW('deleteAdjunto', [adjId], 'Eliminando…', function(_, msg) {
       toast(msg || 'Adjunto eliminado.', 'success');
       if (incId) cargarAdjuntosModal(incId);
     });

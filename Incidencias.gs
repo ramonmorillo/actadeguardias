@@ -1,5 +1,6 @@
 /**
  * CRUD de Incidencias dentro de un Parte de Guardia.
+ * Todas las funciones de escritura reciben el token de sesión como primer parámetro.
  */
 
 // ── Mapper fila → objeto ───────────────────────────────────────────────────
@@ -29,16 +30,14 @@ function rowToIncidencia(row) {
 
 // ── Crear ──────────────────────────────────────────────────────────────────
 
-function createIncidencia(data) {
+function createIncidencia(token, data) {
   try {
-    requireEditPermission();
-    var email = getCurrentUser();
+    var user = requireEditPermission(token);
     requireField(data.idParte,     'Parte asociado');
     requireField(data.descripcion, 'Descripción');
     requireField(data.area,        'Área');
     requireField(data.tipoEntrada, 'Tipo de entrada');
 
-    // Avisos de privacidad (no bloquean, solo devuelven advertencias)
     var warnings = checkSensitiveData([
       { name: 'Descripción', value: data.descripcion },
       { name: 'Actuación',   value: data.actuacion || '' },
@@ -60,7 +59,7 @@ function createIncidencia(data) {
       data.servicio     || '',
       data.prioridad    || 'media',
       data.etiquetas    || '',
-      email, now, now, email,
+      user.email, now, now, user.email,
       data.estado       || CONFIG.ESTADOS_INCIDENCIA.ABIERTA,
       data.seguimiento  || '',
       false
@@ -106,14 +105,13 @@ function listIncidenciasByParte(parteId) {
 
 // ── Actualizar ─────────────────────────────────────────────────────────────
 
-function updateIncidencia(id, data) {
+function updateIncidencia(token, id, data) {
   try {
-    requireEditPermission();
-    var email  = getCurrentUser();
+    var user   = requireEditPermission(token);
     var result = findRow(CONFIG.SHEETS.INCIDENCIAS, COLS.INCIDENCIAS.ID, id);
     if (!result) throw new Error('Incidencia no encontrada.');
 
-    var row = result.row.slice();
+    var row    = result.row.slice();
     var campos = {
       fechaEvento:  COLS.INCIDENCIAS.FECHA_EVENTO,
       area:         COLS.INCIDENCIAS.AREA,
@@ -135,7 +133,7 @@ function updateIncidencia(id, data) {
     });
 
     row[COLS.INCIDENCIAS.FECHA_MODIFICACION] = new Date();
-    row[COLS.INCIDENCIAS.MODIFICADO_POR]     = email;
+    row[COLS.INCIDENCIAS.MODIFICADO_POR]     = user.email;
 
     updateRow(CONFIG.SHEETS.INCIDENCIAS, result.rowIndex, row);
 
@@ -151,12 +149,11 @@ function updateIncidencia(id, data) {
   }
 }
 
-/** Actualiza sólo el estado de una incidencia. */
-function updateEstadoIncidencia(id, nuevoEstado) {
-  return updateIncidencia(id, { estado: nuevoEstado });
+function updateEstadoIncidencia(token, id, nuevoEstado) {
+  return updateIncidencia(token, id, { estado: nuevoEstado });
 }
 
-/** Marca tieneAdjuntos = true en una incidencia (llamado desde Adjuntos.gs). */
+/** Interno: marca tieneAdjuntos = true. Llamado desde Adjuntos.gs. */
 function marcarConAdjuntos(incidenciaId) {
   var result = findRow(CONFIG.SHEETS.INCIDENCIAS, COLS.INCIDENCIAS.ID, incidenciaId);
   if (result) {
