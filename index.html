@@ -203,6 +203,11 @@
             <i class="bi bi-graph-up me-1"></i>Estadísticas
           </a>
         </li>
+        <li class="nav-item" id="nav-item-usuarios" style="display:none;">
+          <a class="nav-link" href="#" id="nav-usuarios" onclick="showView('usuarios')">
+            <i class="bi bi-people me-1"></i>Usuarios
+          </a>
+        </li>
       </ul>
       <div class="d-flex align-items-center gap-2 ms-auto">
         <span class="navbar-text" style="font-size:.82rem;opacity:.85;">
@@ -803,6 +808,34 @@
 
   </div>
 
+  <!-- USUARIOS (solo admin) -->
+  <div id="view-usuarios" class="view">
+
+    <div class="vista-header">
+      <h4><i class="bi bi-people-fill text-primary me-1"></i>Gestión de usuarios</h4>
+      <button class="btn btn-primary btn-sm ms-auto" onclick="abrirModalAddUser()">
+        <i class="bi bi-person-plus me-1"></i>Añadir usuario
+      </button>
+    </div>
+
+    <div class="table-card">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead>
+            <tr>
+              <th>Email</th><th>Nombre</th><th>Rol</th>
+              <th>Estado</th><th>Alta</th><th class="text-end">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="usuarios-body">
+            <tr><td colspan="6" class="text-center text-muted py-3">Cargando…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
 </div><!-- /main-content -->
 
 <!-- ╔══════════════════════════════════════════════════════╗
@@ -1060,6 +1093,50 @@
   </div>
 </div>
 
+<!-- ╔══════════════════════════════════════════════════════╗
+     ║  MODAL — AÑADIR USUARIO                              ║
+     ╚══════════════════════════════════════════════════════╝ -->
+<div class="modal fade" id="modalAddUser" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title"><i class="bi bi-person-plus me-1"></i>Añadir usuario</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label fw-semibold">Email <span class="text-danger">*</span></label>
+            <input type="email" class="form-control" id="au-email" placeholder="usuario@farmacia.es">
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-semibold">Nombre completo <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="au-nombre" placeholder="Nombre Apellidos">
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label fw-semibold">Rol <span class="text-danger">*</span></label>
+            <select class="form-select" id="au-rol">
+              <option value="lector">Lector</option>
+              <option value="editor">Editor</option>
+              <option value="admin">Administrador</option>
+            </select>
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label fw-semibold">Contraseña <span class="text-danger">*</span></label>
+            <input type="password" class="form-control" id="au-password" placeholder="Mínimo 4 caracteres">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-primary" onclick="guardarNuevoUsuario()">
+          <i class="bi bi-floppy me-1"></i>Crear usuario
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ── SPINNER OVERLAY ────────────────────────────────── -->
 <div id="spinner-overlay">
   <div class="text-center">
@@ -1094,7 +1171,8 @@ var APP = {
   modalParteInst:   null,
   modalIncInst:     null,
   modalConfirmInst: null,
-  modalPasswordInst:null
+  modalPasswordInst:null,
+  modalAddUserInst: null
 };
 
 // ══════════════════════════════════════════════════════
@@ -1159,6 +1237,7 @@ function showView(viewId) {
   else if (viewId === 'busqueda')     initBusqueda();
   else if (viewId === 'informes')     initInformes();
   else if (viewId === 'estadisticas') cargarEstadisticas();
+  else if (viewId === 'usuarios')     cargarUsuarios();
 }
 
 // ══════════════════════════════════════════════════════
@@ -1256,6 +1335,7 @@ window.addEventListener('load', function() {
   APP.modalIncInst      = new bootstrap.Modal(document.getElementById('modalIncidencia'));
   APP.modalConfirmInst  = new bootstrap.Modal(document.getElementById('modalConfirm'));
   APP.modalPasswordInst = new bootstrap.Modal(document.getElementById('modalPassword'));
+  APP.modalAddUserInst  = new bootstrap.Modal(document.getElementById('modalAddUser'));
 
   // Intenta restaurar sesión guardada
   var savedToken = sessionStorage.getItem('gf_token');
@@ -1323,6 +1403,8 @@ function iniciarApp(user) {
   APP.user = user;
   document.getElementById('user-name').textContent = user.nombre || user.email;
   document.getElementById('user-rol').textContent  = user.rol;
+  document.getElementById('nav-item-usuarios').style.display =
+    user.rol === 'admin' ? '' : 'none';
   llamar('getCatalogos', [], null, function(cat) {
     APP.catalogos = cat;
     poblarSelectoresCatalogos();
@@ -2218,6 +2300,86 @@ function renderChartArray(canvasId, tipo, arrayData, color) {
   var etiquetas = arrayData.map(function(d){ return d.etiqueta; });
   var valores   = arrayData.map(function(d){ return d.valor; });
   renderChartRaw(canvasId, tipo, etiquetas, valores, color);
+}
+
+// ══════════════════════════════════════════════════════
+//  GESTIÓN DE USUARIOS (solo admin)
+// ══════════════════════════════════════════════════════
+
+function cargarUsuarios() {
+  llamarW('getUsuarios', [], 'Cargando usuarios…', function(usuarios) {
+    var tbody = document.getElementById('usuarios-body');
+    if (!usuarios || !usuarios.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">Sin usuarios registrados.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = usuarios.map(function(u) {
+      var activoBadge = u.activo
+        ? '<span class="badge badge-estado-resuelta">Activo</span>'
+        : '<span class="badge badge-estado-cerrada">Inactivo</span>';
+      var rolBadge = '<span class="badge ' +
+        (u.rol === 'admin' ? 'bg-danger' : u.rol === 'editor' ? 'bg-primary' : 'bg-secondary') +
+        '">' + u.rol + '</span>';
+      var esYo = APP.user && u.email === APP.user.email;
+      return '<tr>' +
+        '<td class="small fw-semibold">' + escHtml(u.email) + (esYo ? ' <span class="text-muted">(tú)</span>' : '') + '</td>' +
+        '<td class="small">' + escHtml(u.nombre || '—') + '</td>' +
+        '<td>' + rolBadge + '</td>' +
+        '<td>' + activoBadge + '</td>' +
+        '<td class="small text-muted">' + fmtD(u.fechaAlta) + '</td>' +
+        '<td class="text-end">' +
+          '<select class="form-select form-select-sm d-inline-block me-1" style="width:auto;" ' +
+            'onchange="cambiarRolUsuario(\'' + escHtml(u.email) + '\', this.value)" ' +
+            (esYo ? 'disabled ' : '') + '>' +
+            ['lector','editor','admin'].map(function(r) {
+              return '<option value="' + r + '"' + (u.rol === r ? ' selected' : '') + '>' + r + '</option>';
+            }).join('') +
+          '</select>' +
+          (!esYo
+            ? '<button class="btn btn-sm ' + (u.activo ? 'btn-outline-warning' : 'btn-outline-success') + ' py-0" ' +
+              'onclick="toggleUsuarioActivo(\'' + escHtml(u.email) + '\')" title="' + (u.activo ? 'Desactivar' : 'Activar') + '">' +
+              '<i class="bi bi-' + (u.activo ? 'person-dash' : 'person-check') + '"></i></button>'
+            : '') +
+        '</td>' +
+      '</tr>';
+    }).join('');
+  });
+}
+
+function abrirModalAddUser() {
+  document.getElementById('au-email').value    = '';
+  document.getElementById('au-nombre').value   = '';
+  document.getElementById('au-rol').value      = 'lector';
+  document.getElementById('au-password').value = '';
+  APP.modalAddUserInst.show();
+}
+
+function guardarNuevoUsuario() {
+  var email = document.getElementById('au-email').value.trim().toLowerCase();
+  var nombre= document.getElementById('au-nombre').value.trim();
+  var rol   = document.getElementById('au-rol').value;
+  var pass  = document.getElementById('au-password').value;
+  if (!email)  { toast('El email es obligatorio.', 'warning'); return; }
+  if (!nombre) { toast('El nombre es obligatorio.', 'warning'); return; }
+  if (!pass || pass.length < 4) { toast('La contraseña debe tener al menos 4 caracteres.', 'warning'); return; }
+  llamarW('addUsuario', [email, nombre, rol, pass], 'Creando usuario…', function(_, msg) {
+    APP.modalAddUserInst.hide();
+    toast(msg || 'Usuario creado.', 'success');
+    cargarUsuarios();
+  });
+}
+
+function cambiarRolUsuario(email, nuevoRol) {
+  llamarW('updateUsuarioRol', [email, nuevoRol], 'Actualizando rol…', function(_, msg) {
+    toast(msg || 'Rol actualizado.', 'success');
+  });
+}
+
+function toggleUsuarioActivo(email) {
+  llamarW('toggleUsuarioActivo', [email], 'Actualizando…', function(_, msg) {
+    toast(msg || 'Usuario actualizado.', 'success');
+    cargarUsuarios();
+  });
 }
 
 function renderChartRaw(canvasId, tipo, etiquetas, valores, colores) {
