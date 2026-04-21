@@ -166,3 +166,41 @@ function duplicateParte(token, id) {
     return fail(e.message);
   }
 }
+
+// ── Eliminar ───────────────────────────────────────────────────────────────
+
+/**
+ * Elimina un parte y todos sus datos (incidencias + adjuntos). Solo admin.
+ * Los archivos de Drive se mueven a la papelera.
+ */
+function deleteParte(token, id) {
+  try {
+    requireAdminPermission(token);
+    var parteResult = findRow(CONFIG.SHEETS.PARTES, COLS.PARTES.ID, id);
+    if (!parteResult) throw new Error('Parte no encontrado.');
+
+    // 1. Adjuntos del parte — Drive + filas (recorrido inverso)
+    var adjData = getAllRaw(CONFIG.SHEETS.ADJUNTOS);
+    for (var j = adjData.length - 1; j >= 1; j--) {
+      if (adjData[j][COLS.ADJUNTOS.ID_PARTE] === id && adjData[j][COLS.ADJUNTOS.ID]) {
+        try { DriveApp.getFileById(adjData[j][COLS.ADJUNTOS.ID_DRIVE]).setTrashed(true); } catch (e) {}
+        deleteRowByIndex(CONFIG.SHEETS.ADJUNTOS, j + 1);
+      }
+    }
+
+    // 2. Incidencias del parte (recorrido inverso)
+    var incData = getAllRaw(CONFIG.SHEETS.INCIDENCIAS);
+    for (var i = incData.length - 1; i >= 1; i--) {
+      if (incData[i][COLS.INCIDENCIAS.ID_PARTE] === id && incData[i][COLS.INCIDENCIAS.ID]) {
+        deleteRowByIndex(CONFIG.SHEETS.INCIDENCIAS, i + 1);
+      }
+    }
+
+    // 3. El parte en sí
+    deleteRowByIndex(CONFIG.SHEETS.PARTES, parteResult.rowIndex);
+    return ok(null, 'Parte y todos sus datos eliminados correctamente.');
+  } catch (e) {
+    logErr('deleteParte', e);
+    return fail(e.message);
+  }
+}

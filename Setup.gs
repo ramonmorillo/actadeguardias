@@ -214,6 +214,74 @@ function addSampleIncidencias(ss, id1, id2, sab1, sab2) {
   sheet.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
 }
 
+// ── Gestión de catálogos (admin) ──────────────────────────────────────────
+
+/** Devuelve todos los ítems del catálogo (activos e inactivos) para el panel de admin. */
+function getCatalogosAdmin(token) {
+  try {
+    requireAdminPermission(token);
+    var data = getAllRaw(CONFIG.SHEETS.CATALOGOS);
+    if (data.length <= 1) return ok([]);
+    var items = [];
+    for (var i = 1; i < data.length; i++) {
+      var row = data[i];
+      if (!row[COLS.CATALOGOS.TIPO]) continue;
+      items.push({
+        rowIndex:   i + 1,
+        tipo:       row[COLS.CATALOGOS.TIPO],
+        valor:      row[COLS.CATALOGOS.VALOR],
+        descripcion:row[COLS.CATALOGOS.DESCRIPCION],
+        activo:     !!row[COLS.CATALOGOS.ACTIVO],
+        orden:      row[COLS.CATALOGOS.ORDEN]
+      });
+    }
+    return ok(items);
+  } catch (e) {
+    logErr('getCatalogosAdmin', e);
+    return fail(e.message);
+  }
+}
+
+/** Añade un nuevo ítem al catálogo. */
+function addCatalogItem(token, tipo, valor, descripcion) {
+  try {
+    requireAdminPermission(token);
+    if (!tipo || !valor) throw new Error('Tipo y valor son obligatorios.');
+    // Calcular siguiente orden dentro del tipo
+    var data = getAllRaw(CONFIG.SHEETS.CATALOGOS);
+    var maxOrden = 0;
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][COLS.CATALOGOS.TIPO] === tipo) {
+        maxOrden = Math.max(maxOrden, data[i][COLS.CATALOGOS.ORDEN] || 0);
+      }
+    }
+    appendRow(CONFIG.SHEETS.CATALOGOS, [tipo, valor, descripcion || '', true, maxOrden + 1]);
+    return ok(null, 'Ítem añadido al catálogo.');
+  } catch (e) {
+    logErr('addCatalogItem', e);
+    return fail(e.message);
+  }
+}
+
+/** Activa o desactiva un ítem del catálogo buscando por tipo + valor exacto. */
+function toggleCatalogItem(token, tipo, valor) {
+  try {
+    requireAdminPermission(token);
+    var data = getAllRaw(CONFIG.SHEETS.CATALOGOS);
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][COLS.CATALOGOS.TIPO] === tipo && data[i][COLS.CATALOGOS.VALOR] === valor) {
+        var current = !!data[i][COLS.CATALOGOS.ACTIVO];
+        setCellValue(CONFIG.SHEETS.CATALOGOS, i + 1, COLS.CATALOGOS.ACTIVO, !current);
+        return ok(null, current ? 'Ítem desactivado.' : 'Ítem activado.');
+      }
+    }
+    return fail('Ítem no encontrado.');
+  } catch (e) {
+    logErr('toggleCatalogItem', e);
+    return fail(e.message);
+  }
+}
+
 // ── Catálogos accesibles desde cliente ────────────────────────────────────
 
 function getCatalogos() {

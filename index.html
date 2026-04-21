@@ -208,6 +208,11 @@
             <i class="bi bi-people me-1"></i>Usuarios
           </a>
         </li>
+        <li class="nav-item" id="nav-item-catalogos" style="display:none;">
+          <a class="nav-link" href="#" id="nav-catalogos" onclick="showView('catalogos')">
+            <i class="bi bi-tags me-1"></i>Catálogos
+          </a>
+        </li>
       </ul>
       <div class="d-flex align-items-center gap-2 ms-auto">
         <span class="navbar-text" style="font-size:.82rem;opacity:.85;">
@@ -557,6 +562,10 @@
             <input type="text" class="form-control" id="bq-registrado" placeholder="Email o nombre">
           </div>
           <div class="col-sm-4 col-md-3">
+            <label class="form-label">Profesional de guardia</label>
+            <input type="text" class="form-control" id="bq-profesional" placeholder="Nombre parcial">
+          </div>
+          <div class="col-sm-4 col-md-3">
             <label class="form-label">Con adjuntos</label>
             <select class="form-select" id="bq-adjuntos">
               <option value="">Indistinto</option>
@@ -839,6 +848,49 @@
         </table>
       </div>
     </div>
+
+  </div>
+
+  <!-- CATÁLOGOS (solo admin) -->
+  <div id="view-catalogos" class="view">
+
+    <div class="vista-header">
+      <h4><i class="bi bi-tags-fill text-primary me-1"></i>Gestión de catálogos</h4>
+    </div>
+
+    <!-- Añadir ítem -->
+    <div class="card border-0 shadow-sm mb-3" style="border-radius:8px;">
+      <div class="card-header bg-transparent border-bottom fw-semibold py-2">Añadir ítem</div>
+      <div class="card-body">
+        <div class="row g-2 align-items-end">
+          <div class="col-sm-3">
+            <label class="form-label">Tipo <span class="text-danger">*</span></label>
+            <select class="form-select form-select-sm" id="cat-nuevo-tipo">
+              <option value="Area">Área</option>
+              <option value="TipoEntrada">Tipo de entrada</option>
+              <option value="TipoPeriodo">Tipo de periodo</option>
+              <option value="Prioridad">Prioridad</option>
+            </select>
+          </div>
+          <div class="col-sm-4">
+            <label class="form-label">Valor <span class="text-danger">*</span></label>
+            <input type="text" class="form-control form-control-sm" id="cat-nuevo-valor" placeholder="Nombre del ítem">
+          </div>
+          <div class="col-sm-3">
+            <label class="form-label">Descripción (opcional)</label>
+            <input type="text" class="form-control form-control-sm" id="cat-nuevo-desc" placeholder="">
+          </div>
+          <div class="col-sm-2">
+            <button class="btn btn-primary btn-sm w-100" onclick="agregarItemCatalogo()">
+              <i class="bi bi-plus-lg me-1"></i>Añadir
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabla de ítems agrupados por tipo -->
+    <div id="cat-container"></div>
 
   </div>
 
@@ -1244,6 +1296,7 @@ function showView(viewId) {
   else if (viewId === 'informes')     initInformes();
   else if (viewId === 'estadisticas') cargarEstadisticas();
   else if (viewId === 'usuarios')     cargarUsuarios();
+  else if (viewId === 'catalogos')    cargarCatalogosAdmin();
 }
 
 // ══════════════════════════════════════════════════════
@@ -1418,8 +1471,9 @@ function iniciarApp(user) {
   APP.user = user;
   document.getElementById('user-name').textContent = user.nombre || user.email;
   document.getElementById('user-rol').textContent  = user.rol;
-  document.getElementById('nav-item-usuarios').style.display =
-    user.rol === 'admin' ? '' : 'none';
+  var adminOnly = user.rol === 'admin' ? '' : 'none';
+  document.getElementById('nav-item-usuarios').style.display  = adminOnly;
+  document.getElementById('nav-item-catalogos').style.display = adminOnly;
   llamar('getCatalogos', [], null, function(cat) {
     APP.catalogos = cat;
     poblarSelectoresCatalogos();
@@ -1593,7 +1647,8 @@ function filtrarHistorico() {
         '<button class="btn btn-outline-primary btn-sm py-0 me-1" onclick="abrirParte(\'' + p.id + '\')" title="Ver"><i class="bi bi-eye"></i></button>' +
         (canEdit ? '<button class="btn btn-outline-secondary btn-sm py-0 me-1" onclick="abrirModalParte(\'' + p.id + '\')" title="Editar"><i class="bi bi-pencil"></i></button>' : '') +
         btnsCerrar +
-        (canEdit ? '<button class="btn btn-outline-secondary btn-sm py-0" onclick="confirmarDuplicar(\'' + p.id + '\')" title="Duplicar"><i class="bi bi-copy"></i></button>' : '') +
+        (canEdit ? '<button class="btn btn-outline-secondary btn-sm py-0 me-1" onclick="confirmarDuplicar(\'' + p.id + '\')" title="Duplicar"><i class="bi bi-copy"></i></button>' : '') +
+        (APP.user && APP.user.rol === 'admin' ? '<button class="btn btn-outline-danger btn-sm py-0" onclick="confirmarEliminarParte(\'' + p.id + '\')" title="Eliminar parte"><i class="bi bi-trash3"></i></button>' : '') +
       '</td>' +
     '</tr>';
   }).join('');
@@ -1782,6 +1837,18 @@ function confirmarDuplicar(id) {
       abrirParte(data.id);
     });
   });
+}
+
+function confirmarEliminarParte(id) {
+  confirmar('Eliminar parte',
+    '¿Eliminar definitivamente el parte ' + id + ' y TODAS sus incidencias y adjuntos? Esta acción no se puede deshacer.',
+    function() {
+      llamarW('deleteParte', [id], 'Eliminando…', function(_, msg) {
+        toast(msg || 'Parte eliminado.', 'success');
+        APP.histAllPartes = APP.histAllPartes.filter(function(p){ return p.id !== id; });
+        filtrarHistorico();
+      });
+    });
 }
 
 </script>
@@ -2070,7 +2137,7 @@ function initBusqueda() {
 }
 
 function limpiarBusqueda() {
-  ['bq-texto','bq-desde','bq-hasta','bq-medicamento','bq-servicio','bq-registrado'].forEach(function(id) {
+  ['bq-texto','bq-desde','bq-hasta','bq-medicamento','bq-servicio','bq-registrado','bq-profesional'].forEach(function(id) {
     document.getElementById(id).value = '';
   });
   ['bq-parte','bq-area','bq-tipo','bq-prioridad','bq-estado','bq-adjuntos'].forEach(function(id) {
@@ -2094,8 +2161,9 @@ function buscar(page) {
     servicio:      document.getElementById('bq-servicio').value.trim()    || undefined,
     prioridad:     document.getElementById('bq-prioridad').value          || undefined,
     estado:        document.getElementById('bq-estado').value             || undefined,
-    registradoPor: document.getElementById('bq-registrado').value.trim()  || undefined,
-    conAdjuntos:   document.getElementById('bq-adjuntos').value === 'si' ? true : undefined,
+    registradoPor:      document.getElementById('bq-registrado').value.trim()   || undefined,
+    profesionalGuardia: document.getElementById('bq-profesional').value.trim()  || undefined,
+    conAdjuntos:        document.getElementById('bq-adjuntos').value === 'si' ? true : undefined,
     page: page, pageSize: 25
   };
 
@@ -2447,6 +2515,90 @@ function toggleUsuarioActivo(email) {
   llamarW('toggleUsuarioActivo', [email], 'Actualizando…', function(_, msg) {
     toast(msg || 'Usuario actualizado.', 'success');
     cargarUsuarios();
+  });
+}
+
+// ══════════════════════════════════════════════════════
+//  GESTIÓN DE CATÁLOGOS (solo admin)
+// ══════════════════════════════════════════════════════
+
+var CAT_TIPO_LABELS = { Area:'Área', TipoEntrada:'Tipo de entrada', TipoPeriodo:'Tipo de periodo', Prioridad:'Prioridad' };
+
+function cargarCatalogosAdmin() {
+  llamarW('getCatalogosAdmin', [], 'Cargando catálogos…', function(items) {
+    var cont = document.getElementById('cat-container');
+    if (!items || !items.length) {
+      cont.innerHTML = '<p class="text-muted text-center py-3">No hay ítems en el catálogo todavía.</p>';
+      return;
+    }
+
+    // Agrupar por tipo
+    var grupos = {};
+    items.forEach(function(it) {
+      if (!grupos[it.tipo]) grupos[it.tipo] = [];
+      grupos[it.tipo].push(it);
+    });
+
+    cont.innerHTML = Object.keys(grupos).map(function(tipo) {
+      var lista = grupos[tipo];
+      var filas = lista.map(function(it) {
+        return '<tr class="' + (!it.activo ? 'text-muted' : '') + '">' +
+          '<td class="small">' + escHtml(it.valor) + '</td>' +
+          '<td class="small text-muted">' + escHtml(it.descripcion || '—') + '</td>' +
+          '<td>' + (it.activo
+            ? '<span class="badge badge-estado-resuelta">Activo</span>'
+            : '<span class="badge badge-estado-cerrada">Inactivo</span>') + '</td>' +
+          '<td class="text-end">' +
+            '<button class="btn btn-sm ' + (it.activo ? 'btn-outline-warning' : 'btn-outline-success') + ' py-0" ' +
+              'onclick="toggleItemCatalogo(\'' + escHtml(it.tipo) + '\',\'' + escHtml(it.valor) + '\')">' +
+              (it.activo ? 'Desactivar' : 'Activar') +
+            '</button>' +
+          '</td>' +
+        '</tr>';
+      }).join('');
+
+      return '<div class="table-card mb-3">' +
+        '<div class="d-flex align-items-center px-3 py-2 border-bottom">' +
+          '<span class="fw-semibold small">' + (CAT_TIPO_LABELS[tipo] || tipo) + '</span>' +
+          '<span class="badge bg-secondary ms-2">' + lista.length + '</span>' +
+        '</div>' +
+        '<div class="table-responsive">' +
+          '<table class="table table-hover mb-0">' +
+          '<thead><tr><th>Valor</th><th>Descripción</th><th>Estado</th><th></th></tr></thead>' +
+          '<tbody>' + filas + '</tbody>' +
+          '</table>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  });
+}
+
+function agregarItemCatalogo() {
+  var tipo  = document.getElementById('cat-nuevo-tipo').value;
+  var valor = document.getElementById('cat-nuevo-valor').value.trim();
+  var desc  = document.getElementById('cat-nuevo-desc').value.trim();
+  if (!valor) { toast('El valor es obligatorio.', 'warning'); return; }
+  llamarW('addCatalogItem', [tipo, valor, desc], 'Añadiendo…', function(_, msg) {
+    toast(msg || 'Ítem añadido.', 'success');
+    document.getElementById('cat-nuevo-valor').value = '';
+    document.getElementById('cat-nuevo-desc').value  = '';
+    cargarCatalogosAdmin();
+    // Recarga catálogos en selectores de la app
+    llamar('getCatalogos', [], null, function(cat) {
+      APP.catalogos = cat;
+      poblarSelectoresCatalogos();
+    });
+  });
+}
+
+function toggleItemCatalogo(tipo, valor) {
+  llamarW('toggleCatalogItem', [tipo, valor], null, function(_, msg) {
+    toast(msg || 'Ítem actualizado.', 'success');
+    cargarCatalogosAdmin();
+    llamar('getCatalogos', [], null, function(cat) {
+      APP.catalogos = cat;
+      poblarSelectoresCatalogos();
+    });
   });
 }
 
