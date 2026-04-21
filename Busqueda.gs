@@ -24,7 +24,9 @@ function searchIncidencias(filtros) {
       for (var p = 1; p < partesData.length; p++) {
         var pRow = partesData[p];
         if (pRow[COLS.PARTES.ID]) {
-          partesMap[pRow[COLS.PARTES.ID]] = (pRow[COLS.PARTES.PROFESIONALES] || '').toLowerCase();
+          partesMap[pRow[COLS.PARTES.ID]] = parseListValue(pRow[COLS.PARTES.PROFESIONALES]).map(function(v) {
+            return v.toLowerCase();
+          });
         }
       }
     }
@@ -108,8 +110,10 @@ function matchesFiltros(row, f, partesMap) {
 
   // Filtro por profesional de guardia del parte
   if (f.profesionalGuardia) {
-    var profs = partesMap[row[COLS.INCIDENCIAS.ID_PARTE]] || '';
-    if (profs.indexOf(f.profesionalGuardia.toLowerCase()) === -1) return false;
+    var profs = partesMap[row[COLS.INCIDENCIAS.ID_PARTE]] || [];
+    var q = f.profesionalGuardia.toLowerCase();
+    var found = profs.some(function(p) { return p.indexOf(q) !== -1; });
+    if (!found) return false;
   }
 
   // Tiene adjuntos

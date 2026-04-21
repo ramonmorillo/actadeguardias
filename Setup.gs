@@ -67,6 +67,15 @@ function initCatalogos(ss) {
     CONFIG.TIPOS_ENTRADA.forEach(function(v) { rows.push(['TipoEntrada', v, '', true, ord++]); });
     CONFIG.PRIORIDADES.forEach(function(v)   { rows.push(['Prioridad',   v, '', true, ord++]); });
     CONFIG.TIPOS_PERIODO.forEach(function(v) { rows.push(['TipoPeriodo', v, '', true, ord++]); });
+    Object.keys(CONFIG.ESTADOS_INCIDENCIA).forEach(function(k) {
+      rows.push(['EstadoIncidencia', CONFIG.ESTADOS_INCIDENCIA[k], '', true, ord++]);
+    });
+    Object.keys(CONFIG.ESTADOS_PARTE).forEach(function(k) {
+      rows.push(['EstadoParte', CONFIG.ESTADOS_PARTE[k], '', true, ord++]);
+    });
+    rows.push(['ProfesionalGuardia', 'Ana García López', '', true, ord++]);
+    rows.push(['ProfesionalGuardia', 'Carlos Martínez Ruiz', '', true, ord++]);
+    rows.push(['ProfesionalGuardia', 'María Fernández Díaz', '', true, ord++]);
     sheet.getRange(2, 1, rows.length, 5).setValues(rows);
   }
 }
@@ -292,7 +301,10 @@ function getCatalogos() {
         Area:        CONFIG.AREAS,
         TipoEntrada: CONFIG.TIPOS_ENTRADA,
         Prioridad:   CONFIG.PRIORIDADES,
-        TipoPeriodo: CONFIG.TIPOS_PERIODO
+        TipoPeriodo: CONFIG.TIPOS_PERIODO,
+        EstadoIncidencia: Object.keys(CONFIG.ESTADOS_INCIDENCIA).map(function(k){ return CONFIG.ESTADOS_INCIDENCIA[k]; }),
+        EstadoParte: Object.keys(CONFIG.ESTADOS_PARTE).map(function(k){ return CONFIG.ESTADOS_PARTE[k]; }),
+        ProfesionalGuardia: []
       });
     }
     var cat = {};

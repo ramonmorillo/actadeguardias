@@ -6,12 +6,14 @@
 // ── Mapper fila → objeto ───────────────────────────────────────────────────
 
 function rowToParte(row) {
+  var profesionalesList = parseListValue(row[COLS.PARTES.PROFESIONALES]);
   return {
     id:                  row[COLS.PARTES.ID],
     fechaInicio:         toISO(row[COLS.PARTES.FECHA_INICIO]),
     fechaFin:            toISO(row[COLS.PARTES.FECHA_FIN]),
     tipoPeriodo:         row[COLS.PARTES.TIPO_PERIODO],
-    profesionales:       row[COLS.PARTES.PROFESIONALES],
+    profesionales:       profesionalesList.join(', '),
+    profesionalesLista:  profesionalesList,
     creadoPor:           row[COLS.PARTES.CREADO_POR],
     fechaCreacion:       toISO(row[COLS.PARTES.FECHA_CREACION]),
     ultimaModificacion:  toISO(row[COLS.PARTES.ULTIMA_MODIFICACION]),
@@ -19,6 +21,32 @@ function rowToParte(row) {
     estado:              row[COLS.PARTES.ESTADO],
     observaciones:       row[COLS.PARTES.OBSERVACIONES]
   };
+}
+
+function validateFromCatalogOrFallback(tipoCatalogo, valor, fallback) {
+  if (!valor) return fallback || '';
+  var c = getCatalogos();
+  if (c && c.success && c.data && c.data[tipoCatalogo] && c.data[tipoCatalogo].length) {
+    if (c.data[tipoCatalogo].indexOf(valor) === -1) {
+      throw new Error('Valor no válido para "' + tipoCatalogo + '": ' + valor);
+    }
+    return valor;
+  }
+  return valor;
+}
+
+function normalizarProfesionalesParte(input) {
+  var profesionales = uniqueCaseInsensitive(parseListValue(input));
+  var c = getCatalogos();
+  if (c && c.success && c.data && c.data.ProfesionalGuardia && c.data.ProfesionalGuardia.length) {
+    var catalogo = c.data.ProfesionalGuardia;
+    profesionales.forEach(function(nombre) {
+      if (catalogo.indexOf(nombre) === -1) {
+        throw new Error('Profesional de guardia no válido: ' + nombre);
+      }
+    });
+  }
+  return stringifyListValue(profesionales);
 }
 
 // ── Crear ──────────────────────────────────────────────────────────────────
@@ -34,16 +62,20 @@ function createParte(token, data) {
       throw new Error('La fecha de fin debe ser posterior a la de inicio.');
     }
 
+    var tipoPeriodo = validateFromCatalogOrFallback('TipoPeriodo', data.tipoPeriodo);
+    var estado = validateFromCatalogOrFallback('EstadoParte', data.estado || CONFIG.ESTADOS_PARTE.BORRADOR, CONFIG.ESTADOS_PARTE.BORRADOR);
+    var profesionales = normalizarProfesionalesParte(data.profesionales || data.profesionalesLista || []);
+
     var id  = generateId('PG');
     var now = new Date();
     appendRow(CONFIG.SHEETS.PARTES, [
       id,
       new Date(data.fechaInicio),
       new Date(data.fechaFin),
-      data.tipoPeriodo,
-      data.profesionales || '',
+      tipoPeriodo,
+      profesionales,
       user.email, now, now, user.email,
-      data.estado || CONFIG.ESTADOS_PARTE.BORRADOR,
+      estado,
       data.observaciones || ''
     ]);
     return ok({ id: id }, 'Parte creado correctamente.');
@@ -148,10 +180,18 @@ function updateParte(token, id, data) {
     var row = result.row.slice();
     if (data.fechaInicio  !== undefined) row[COLS.PARTES.FECHA_INICIO]  = new Date(data.fechaInicio);
     if (data.fechaFin     !== undefined) row[COLS.PARTES.FECHA_FIN]     = new Date(data.fechaFin);
-    if (data.tipoPeriodo  !== undefined) row[COLS.PARTES.TIPO_PERIODO]  = data.tipoPeriodo;
-    if (data.profesionales!== undefined) row[COLS.PARTES.PROFESIONALES] = data.profesionales;
+    if (data.tipoPeriodo  !== undefined) {
+      row[COLS.PARTES.TIPO_PERIODO] = validateFromCatalogOrFallback('TipoPeriodo', data.tipoPeriodo);
+    }
+    if (data.profesionales!== undefined || data.profesionalesLista !== undefined) {
+      row[COLS.PARTES.PROFESIONALES] = normalizarProfesionalesParte(
+        data.profesionalesLista !== undefined ? data.profesionalesLista : data.profesionales
+      );
+    }
     if (data.observaciones!== undefined) row[COLS.PARTES.OBSERVACIONES] = data.observaciones;
-    if (data.estado       !== undefined) row[COLS.PARTES.ESTADO]        = data.estado;
+    if (data.estado       !== undefined) {
+      row[COLS.PARTES.ESTADO] = validateFromCatalogOrFallback('EstadoParte', data.estado);
+    }
 
     row[COLS.PARTES.ULTIMA_MODIFICACION] = new Date();
     row[COLS.PARTES.MODIFICADO_POR]      = user.email;
@@ -189,7 +229,7 @@ function duplicateParte(token, id) {
       fechaInicio:   p.data.fechaInicio,
       fechaFin:      p.data.fechaFin,
       tipoPeriodo:   p.data.tipoPeriodo,
-      profesionales: p.data.profesionales,
+      profesionalesLista: p.data.profesionalesLista,
       observaciones: '[Duplicado de ' + id + '] ' + (p.data.observaciones || '')
     });
   } catch (e) {
