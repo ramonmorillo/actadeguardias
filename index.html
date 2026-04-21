@@ -120,10 +120,50 @@
       #main-content { padding: .75rem; }
       .kpi-num { font-size: 1.4rem; }
     }
+
+    /* ── Login overlay ── */
+    #login-overlay {
+      position: fixed; inset: 0; background: var(--gris-bg);
+      z-index: 20000; display: flex; align-items: center; justify-content: center;
+    }
+    #login-overlay.hidden { display: none; }
+    .login-box {
+      background: #fff; border: 1px solid var(--borde); border-radius: 12px;
+      padding: 2.5rem 2rem; width: 100%; max-width: 400px;
+      box-shadow: 0 4px 24px rgba(0,0,0,.10);
+    }
+    .login-box .login-logo { font-size: 2rem; color: var(--azul); }
   </style>
 </head>
 
 <body>
+
+<!-- ╔══════════════════════════════════════════════════════╗
+     ║  LOGIN OVERLAY                                       ║
+     ╚══════════════════════════════════════════════════════╝ -->
+<div id="login-overlay">
+  <div class="login-box text-center">
+    <div class="login-logo mb-2"><i class="bi bi-capsule"></i></div>
+    <h5 class="fw-bold mb-1">Guardias · Farmacia</h5>
+    <p class="text-muted small mb-4">Acceso con usuario corporativo</p>
+    <div class="text-start">
+      <div class="mb-3">
+        <label class="form-label fw-semibold" for="login-email">Email</label>
+        <input type="email" class="form-control" id="login-email" placeholder="usuario@farmacia.es"
+               autocomplete="username" onkeydown="if(event.key==='Enter')document.getElementById('login-pass').focus()">
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-semibold" for="login-pass">Contraseña</label>
+        <input type="password" class="form-control" id="login-pass"
+               autocomplete="current-password" onkeydown="if(event.key==='Enter')hacerLogin()">
+      </div>
+      <div id="login-error" class="alert alert-danger py-2 small mb-3" style="display:none;"></div>
+      <button class="btn btn-primary w-100" onclick="hacerLogin()">
+        <i class="bi bi-box-arrow-in-right me-1"></i>Entrar
+      </button>
+    </div>
+  </div>
+</div>
 
 <!-- ╔══════════════════════════════════════════════════════╗
      ║  NAVBAR                                              ║
@@ -163,11 +203,29 @@
             <i class="bi bi-graph-up me-1"></i>Estadísticas
           </a>
         </li>
+        <li class="nav-item" id="nav-item-usuarios" style="display:none;">
+          <a class="nav-link" href="#" id="nav-usuarios" onclick="showView('usuarios')">
+            <i class="bi bi-people me-1"></i>Usuarios
+          </a>
+        </li>
+        <li class="nav-item" id="nav-item-catalogos" style="display:none;">
+          <a class="nav-link" href="#" id="nav-catalogos" onclick="showView('catalogos')">
+            <i class="bi bi-tags me-1"></i>Catálogos
+          </a>
+        </li>
       </ul>
-      <span class="navbar-text me-3" id="user-badge" style="font-size:.82rem;opacity:.85;">
-        <i class="bi bi-person-circle me-1"></i><span id="user-name">…</span>
-        <span id="user-rol" class="badge bg-light text-dark ms-1" style="font-size:.7rem;"></span>
-      </span>
+      <div class="d-flex align-items-center gap-2 ms-auto">
+        <span class="navbar-text" style="font-size:.82rem;opacity:.85;">
+          <i class="bi bi-person-circle me-1"></i><span id="user-name">…</span>
+          <span id="user-rol" class="badge bg-light text-dark ms-1" style="font-size:.7rem;"></span>
+        </span>
+        <button class="btn btn-outline-light btn-sm" title="Cambiar contraseña" onclick="abrirModalPassword()">
+          <i class="bi bi-key"></i>
+        </button>
+        <button class="btn btn-outline-light btn-sm" title="Cerrar sesión" onclick="hacerLogout()">
+          <i class="bi bi-box-arrow-right"></i>
+        </button>
+      </div>
     </div>
   </div>
 </nav>
@@ -234,7 +292,7 @@
           <thead>
             <tr>
               <th>ID</th><th>Periodo</th><th>Tipo</th>
-              <th>Profesionales</th><th>Estado</th><th>Creado por</th><th></th>
+              <th>Profesionales</th><th class="text-center">Inc.</th><th>Estado</th><th>Creado por</th><th></th>
             </tr>
           </thead>
           <tbody id="dash-partes-body">
@@ -244,8 +302,8 @@
       </div>
     </div>
 
-    <!-- Incidencias críticas/abiertas recientes -->
-    <div class="table-card">
+    <!-- Incidencias abiertas recientes -->
+    <div class="table-card mb-4">
       <div class="d-flex align-items-center px-3 py-2 border-bottom">
         <span class="fw-semibold"><i class="bi bi-exclamation-circle me-1 text-danger"></i>Incidencias abiertas recientes</span>
         <a href="#" class="ms-auto small text-primary" onclick="showView('busqueda')">Buscar más</a>
@@ -260,6 +318,27 @@
           </thead>
           <tbody id="dash-incidencias-body">
             <tr><td colspan="7" class="text-center text-muted py-3">Cargando…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Pendientes de seguimiento -->
+    <div class="table-card">
+      <div class="d-flex align-items-center px-3 py-2 border-bottom">
+        <span class="fw-semibold"><i class="bi bi-arrow-right-circle me-1 text-warning"></i>Pendientes de seguimiento</span>
+        <a href="#" class="ms-auto small text-primary"
+           onclick="document.getElementById('bq-adjuntos').value='';document.getElementById('bq-texto').value='';showView('busqueda')">Ver en búsqueda</a>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead>
+            <tr>
+              <th>Fecha</th><th>Área</th><th>Seguimiento pendiente</th><th>Prioridad</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="dash-seguimiento-body">
+            <tr><td colspan="5" class="text-center text-muted py-3">Cargando…</td></tr>
           </tbody>
         </table>
       </div>
@@ -346,6 +425,12 @@
         </button>
         <button class="btn btn-outline-secondary btn-sm" id="btn-cerrar-parte" onclick="cerrarParte()">
           <i class="bi bi-lock me-1"></i>Cerrar parte
+        </button>
+        <button class="btn btn-outline-warning btn-sm" id="btn-reabrir-parte" onclick="reabrirParte()" style="display:none;">
+          <i class="bi bi-lock-fill me-1"></i>Reabrir parte
+        </button>
+        <button class="btn btn-outline-secondary btn-sm" onclick="imprimirParte()">
+          <i class="bi bi-printer me-1"></i>Imprimir
         </button>
         <button class="btn btn-outline-secondary btn-sm" onclick="duplicarParte()">
           <i class="bi bi-copy me-1"></i>Duplicar
@@ -496,6 +581,10 @@
           <div class="col-sm-4 col-md-3">
             <label class="form-label">Registrado por</label>
             <input type="text" class="form-control" id="bq-registrado" placeholder="Email o nombre">
+          </div>
+          <div class="col-sm-4 col-md-3">
+            <label class="form-label">Profesional de guardia</label>
+            <input type="text" class="form-control" id="bq-profesional" placeholder="Nombre parcial">
           </div>
           <div class="col-sm-4 col-md-3">
             <label class="form-label">Con adjuntos</label>
@@ -755,6 +844,77 @@
 
   </div>
 
+  <!-- USUARIOS (solo admin) -->
+  <div id="view-usuarios" class="view">
+
+    <div class="vista-header">
+      <h4><i class="bi bi-people-fill text-primary me-1"></i>Gestión de usuarios</h4>
+      <button class="btn btn-primary btn-sm ms-auto" onclick="abrirModalAddUser()">
+        <i class="bi bi-person-plus me-1"></i>Añadir usuario
+      </button>
+    </div>
+
+    <div class="table-card">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead>
+            <tr>
+              <th>Email</th><th>Nombre</th><th>Rol</th>
+              <th>Estado</th><th>Alta</th><th class="text-end">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="usuarios-body">
+            <tr><td colspan="6" class="text-center text-muted py-3">Cargando…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- CATÁLOGOS (solo admin) -->
+  <div id="view-catalogos" class="view">
+
+    <div class="vista-header">
+      <h4><i class="bi bi-tags-fill text-primary me-1"></i>Gestión de catálogos</h4>
+    </div>
+
+    <!-- Añadir ítem -->
+    <div class="card border-0 shadow-sm mb-3" style="border-radius:8px;">
+      <div class="card-header bg-transparent border-bottom fw-semibold py-2">Añadir ítem</div>
+      <div class="card-body">
+        <div class="row g-2 align-items-end">
+          <div class="col-sm-3">
+            <label class="form-label">Tipo <span class="text-danger">*</span></label>
+            <select class="form-select form-select-sm" id="cat-nuevo-tipo">
+              <option value="Area">Área</option>
+              <option value="TipoEntrada">Tipo de entrada</option>
+              <option value="TipoPeriodo">Tipo de periodo</option>
+              <option value="Prioridad">Prioridad</option>
+            </select>
+          </div>
+          <div class="col-sm-4">
+            <label class="form-label">Valor <span class="text-danger">*</span></label>
+            <input type="text" class="form-control form-control-sm" id="cat-nuevo-valor" placeholder="Nombre del ítem">
+          </div>
+          <div class="col-sm-3">
+            <label class="form-label">Descripción (opcional)</label>
+            <input type="text" class="form-control form-control-sm" id="cat-nuevo-desc" placeholder="">
+          </div>
+          <div class="col-sm-2">
+            <button class="btn btn-primary btn-sm w-100" onclick="agregarItemCatalogo()">
+              <i class="bi bi-plus-lg me-1"></i>Añadir
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabla de ítems agrupados por tipo -->
+    <div id="cat-container"></div>
+
+  </div>
+
 </div><!-- /main-content -->
 
 <!-- ╔══════════════════════════════════════════════════════╗
@@ -978,6 +1138,84 @@
   </div>
 </div>
 
+<!-- ╔══════════════════════════════════════════════════════╗
+     ║  MODAL — CAMBIO DE CONTRASEÑA                        ║
+     ╚══════════════════════════════════════════════════════╝ -->
+<div class="modal fade" id="modalPassword" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-sm modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title"><i class="bi bi-key me-1"></i>Cambiar contraseña</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="pwd-admin-row" class="mb-3" style="display:none;">
+          <label class="form-label fw-semibold" style="font-size:.85rem;">Email del usuario <span class="text-muted small">(admin)</span></label>
+          <input type="email" class="form-control form-control-sm" id="pwd-target-email" placeholder="usuario@farmacia.es">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold" style="font-size:.85rem;">Nueva contraseña</label>
+          <input type="password" class="form-control form-control-sm" id="pwd-nueva" placeholder="Mínimo 4 caracteres">
+        </div>
+        <div class="mb-0">
+          <label class="form-label fw-semibold" style="font-size:.85rem;">Repetir contraseña</label>
+          <input type="password" class="form-control form-control-sm" id="pwd-repite">
+        </div>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-primary btn-sm" onclick="guardarPassword()">
+          <i class="bi bi-floppy me-1"></i>Guardar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ╔══════════════════════════════════════════════════════╗
+     ║  MODAL — AÑADIR USUARIO                              ║
+     ╚══════════════════════════════════════════════════════╝ -->
+<div class="modal fade" id="modalAddUser" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title"><i class="bi bi-person-plus me-1"></i>Añadir usuario</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label fw-semibold">Email <span class="text-danger">*</span></label>
+            <input type="email" class="form-control" id="au-email" placeholder="usuario@farmacia.es">
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-semibold">Nombre completo <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="au-nombre" placeholder="Nombre Apellidos">
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label fw-semibold">Rol <span class="text-danger">*</span></label>
+            <select class="form-select" id="au-rol">
+              <option value="lector">Lector</option>
+              <option value="editor">Editor</option>
+              <option value="admin">Administrador</option>
+            </select>
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label fw-semibold">Contraseña <span class="text-danger">*</span></label>
+            <input type="password" class="form-control" id="au-password" placeholder="Mínimo 4 caracteres">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-primary" onclick="guardarNuevoUsuario()">
+          <i class="bi bi-floppy me-1"></i>Crear usuario
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ── SPINNER OVERLAY ────────────────────────────────── -->
 <div id="spinner-overlay">
   <div class="text-center">
@@ -1000,17 +1238,20 @@
 // ══════════════════════════════════════════════════════
 var APP = {
   user:            null,   // { email, nombre, rol }
-  catalogos:       null,   // { Area:[…], TipoEntrada:[…], … }
+  token:           null,   // token de sesión interna
+  catalogos:       null,
   currentParteId:  null,
   currentIncId:    null,
-  parteIncidencias:[],     // caché de incidencias del parte activo
+  parteIncidencias:[],
   bqPage:          1,
   informeData:     null,
   charts:          {},
-  histAllPartes:   [],     // caché lista partes
-  modalParteInst:  null,
-  modalIncInst:    null,
-  modalConfirmInst:null
+  histAllPartes:   [],
+  modalParteInst:   null,
+  modalIncInst:     null,
+  modalConfirmInst: null,
+  modalPasswordInst:null,
+  modalAddUserInst: null
 };
 
 // ══════════════════════════════════════════════════════
@@ -1075,6 +1316,8 @@ function showView(viewId) {
   else if (viewId === 'busqueda')     initBusqueda();
   else if (viewId === 'informes')     initInformes();
   else if (viewId === 'estadisticas') cargarEstadisticas();
+  else if (viewId === 'usuarios')     cargarUsuarios();
+  else if (viewId === 'catalogos')    cargarCatalogosAdmin();
 }
 
 // ══════════════════════════════════════════════════════
@@ -1138,6 +1381,15 @@ function llamar(fnName, args, spinnerMsg, onSuccess, onError) {
       hideSpinner();
       if (!result || !result.success) {
         var msg = (result && result.message) || 'Error desconocido';
+        var low = msg.toLowerCase();
+        if (low.indexOf('sesión') !== -1 &&
+            (low.indexOf('expirada') !== -1 || low.indexOf('no válida') !== -1 || low.indexOf('no hay sesión') !== -1)) {
+          APP.token = null;
+          sessionStorage.removeItem('gf_token');
+          toast('Tu sesión ha expirado. Por favor, vuelve a iniciar sesión.', 'warning');
+          setTimeout(mostrarLogin, 1200);
+          return;
+        }
         toast(msg, 'danger');
         if (onError) onError(msg);
       } else {
@@ -1158,29 +1410,97 @@ function llamar(fnName, args, spinnerMsg, onSuccess, onError) {
   }
 }
 
+// Llamada autenticada: prepende APP.token como primer argumento
+function llamarW(fnName, args, spinnerMsg, onSuccess, onError) {
+  llamar(fnName, [APP.token].concat(args || []), spinnerMsg, onSuccess, onError);
+}
+
 // ══════════════════════════════════════════════════════
 //  INICIALIZACIÓN
 // ══════════════════════════════════════════════════════
 
 window.addEventListener('load', function() {
-  // Instanciar modales Bootstrap
-  APP.modalParteInst   = new bootstrap.Modal(document.getElementById('modalParte'));
-  APP.modalIncInst     = new bootstrap.Modal(document.getElementById('modalIncidencia'));
-  APP.modalConfirmInst = new bootstrap.Modal(document.getElementById('modalConfirm'));
+  APP.modalParteInst    = new bootstrap.Modal(document.getElementById('modalParte'));
+  APP.modalIncInst      = new bootstrap.Modal(document.getElementById('modalIncidencia'));
+  APP.modalConfirmInst  = new bootstrap.Modal(document.getElementById('modalConfirm'));
+  APP.modalPasswordInst = new bootstrap.Modal(document.getElementById('modalPassword'));
+  APP.modalAddUserInst  = new bootstrap.Modal(document.getElementById('modalAddUser'));
 
-  // Cargar usuario e info inicial
-  llamar('getCurrentUserInfo', [], 'Iniciando…', function(user) {
-    APP.user = user;
-    document.getElementById('user-name').textContent = user.nombre || user.email;
-    document.getElementById('user-rol').textContent  = user.rol;
-
-    llamar('getCatalogos', [], null, function(cat) {
-      APP.catalogos = cat;
-      poblarSelectoresCatalogos();
-      showView('dashboard');
+  // Intenta restaurar sesión guardada
+  var savedToken = sessionStorage.getItem('gf_token');
+  if (savedToken) {
+    showSpinner('Verificando sesión…');
+    llamar('getCurrentUserInfo', [savedToken], null, function(user) {
+      hideSpinner();
+      APP.token = savedToken;
+      iniciarApp(user);
+    }, function() {
+      hideSpinner();
+      sessionStorage.removeItem('gf_token');
+      mostrarLogin();
     });
-  });
+  } else {
+    mostrarLogin();
+  }
 });
+
+function mostrarLogin() {
+  document.getElementById('login-overlay').classList.remove('hidden');
+  setTimeout(function(){ document.getElementById('login-email').focus(); }, 100);
+}
+
+function hacerLogin() {
+  var email = document.getElementById('login-email').value.trim().toLowerCase();
+  var pass  = document.getElementById('login-pass').value;
+  var errEl = document.getElementById('login-error');
+  errEl.style.display = 'none';
+
+  if (!email || !pass) {
+    errEl.textContent = 'Introduce tu email y contraseña.';
+    errEl.style.display = '';
+    return;
+  }
+
+  showSpinner('Iniciando sesión…');
+  llamar('loginUsuario', [email, pass], null, function(data) {
+    hideSpinner();
+    APP.token = data.token;
+    sessionStorage.setItem('gf_token', data.token);
+    document.getElementById('login-pass').value = '';
+    document.getElementById('login-overlay').classList.add('hidden');
+    iniciarApp(data.user);
+  }, function(msg) {
+    hideSpinner();
+    errEl.textContent = msg || 'Credenciales incorrectas.';
+    errEl.style.display = '';
+  });
+}
+
+function hacerLogout() {
+  if (APP.token) {
+    llamar('logoutUsuario', [APP.token], null, function() {}, function() {});
+  }
+  APP.token = null;
+  APP.user  = null;
+  sessionStorage.removeItem('gf_token');
+  document.getElementById('login-email').value = '';
+  document.getElementById('login-pass').value  = '';
+  mostrarLogin();
+}
+
+function iniciarApp(user) {
+  APP.user = user;
+  document.getElementById('user-name').textContent = user.nombre || user.email;
+  document.getElementById('user-rol').textContent  = user.rol;
+  var adminOnly = user.rol === 'admin' ? '' : 'none';
+  document.getElementById('nav-item-usuarios').style.display  = adminOnly;
+  document.getElementById('nav-item-catalogos').style.display = adminOnly;
+  llamar('getCatalogos', [], null, function(cat) {
+    APP.catalogos = cat;
+    poblarSelectoresCatalogos();
+    showView('dashboard');
+  });
+}
 
 function poblarSelectoresCatalogos() {
   var cat = APP.catalogos || {};
@@ -1205,6 +1525,35 @@ function poblarSelectoresCatalogos() {
   llenarSelect('inc-filtro-area', areas);
 }
 
+function abrirModalPassword() {
+  document.getElementById('pwd-nueva').value   = '';
+  document.getElementById('pwd-repite').value  = '';
+  var isAdmin = APP.user && APP.user.rol === 'admin';
+  var adminRow = document.getElementById('pwd-admin-row');
+  adminRow.style.display = isAdmin ? '' : 'none';
+  if (isAdmin) {
+    document.getElementById('pwd-target-email').value = '';
+  }
+  APP.modalPasswordInst.show();
+}
+
+function guardarPassword() {
+  var nueva  = document.getElementById('pwd-nueva').value;
+  var repite = document.getElementById('pwd-repite').value;
+  if (!nueva || nueva.length < 4) { toast('La contraseña debe tener al menos 4 caracteres.', 'warning'); return; }
+  if (nueva !== repite)           { toast('Las contraseñas no coinciden.', 'warning'); return; }
+
+  var isAdmin = APP.user && APP.user.rol === 'admin';
+  var targetEmail = isAdmin
+    ? (document.getElementById('pwd-target-email').value.trim().toLowerCase() || APP.user.email)
+    : APP.user.email;
+
+  llamarW('cambiarPassword', [targetEmail, nueva], 'Guardando…', function(_, msg) {
+    APP.modalPasswordInst.hide();
+    toast(msg || 'Contraseña actualizada.', 'success');
+  });
+}
+
 </script>
 <!-- FIN BLOQUE_SCRIPTS_1 -->
 <script>
@@ -1213,16 +1562,25 @@ function poblarSelectoresCatalogos() {
 // ══════════════════════════════════════════════════════
 
 function cargarDashboard() {
-  llamar('listPartes', [8], 'Cargando panel…', function(partes) {
+  var ahora  = new Date();
+  var hace90 = new Date(ahora); hace90.setDate(ahora.getDate() - 90);
+  var fmt = function(d){ return d.toISOString().substr(0, 10); };
+  var kpiParams = { fechaDesde: fmt(hace90), fechaHasta: fmt(ahora) };
+
+  llamar('listPartesConConteo', [8], 'Cargando panel…', function(partes) {
     renderDashPartes(partes);
   });
-  llamar('getEstadisticas', [{}], null, function(est) {
+  llamar('getEstadisticas', [kpiParams], null, function(est) {
     document.getElementById('kpi-partes').textContent    = est.totalPartes;
     document.getElementById('kpi-abiertas').textContent  = est.abiertas;
     document.getElementById('kpi-criticas').textContent  = est.criticas;
     document.getElementById('kpi-resueltas').textContent = est.resueltas;
-    renderDashIncidencias(est);
+    renderDashIncidencias();
   });
+  // Pendientes de seguimiento
+  llamar('searchIncidencias', [{ conSeguimiento: true, pageSize: 6, page: 1 }], null,
+    function(res) { renderDashSeguimiento(res.resultados || []); }
+  );
 }
 
 function renderDashPartes(partes) {
@@ -1237,6 +1595,7 @@ function renderDashPartes(partes) {
       '<td class="small">' + fmtD(p.fechaInicio) + ' – ' + fmtD(p.fechaFin) + '</td>' +
       '<td class="small">' + (p.tipoPeriodo||'—') + '</td>' +
       '<td class="small">' + truncar(p.profesionales, 35) + '</td>' +
+      '<td class="text-center small">' + (p.numIncidencias !== undefined ? p.numIncidencias : '—') + '</td>' +
       '<td>' + badgeEstado(p.estado) + '</td>' +
       '<td class="small text-muted">' + (p.creadoPor||'—') + '</td>' +
       '<td><button class="btn btn-outline-primary btn-sm py-0" onclick="abrirParte(\'' + p.id + '\')"><i class="bi bi-eye"></i></button></td>' +
@@ -1244,13 +1603,12 @@ function renderDashPartes(partes) {
   }).join('');
 }
 
-function renderDashIncidencias(est) {
-  // Cargamos incidencias abiertas buscando con filtro estado=abierta
+function renderDashIncidencias() {
   llamar('searchIncidencias', [{ estado:'abierta', pageSize:8, page:1 }], null, function(res) {
     var tbody = document.getElementById('dash-incidencias-body');
     var incs = res.resultados || [];
     if (!incs.length) {
-      tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">Sin incidencias abiertas. ✔</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">Sin incidencias abiertas. ✓</td></tr>';
       return;
     }
     tbody.innerHTML = incs.map(function(i) {
@@ -1267,12 +1625,30 @@ function renderDashIncidencias(est) {
   });
 }
 
+function renderDashSeguimiento(incs) {
+  var cont = document.getElementById('dash-seguimiento-body');
+  if (!cont) return;
+  if (!incs.length) {
+    cont.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">Sin pendientes de seguimiento. ✓</td></tr>';
+    return;
+  }
+  cont.innerHTML = incs.map(function(i) {
+    return '<tr>' +
+      '<td class="small">' + fmtDT(i.fechaEvento) + '</td>' +
+      '<td class="small">' + (i.area||'—') + '</td>' +
+      '<td class="small text-warning-emphasis fw-semibold">' + truncar(i.seguimiento, 80) + '</td>' +
+      '<td>' + badgePrio(i.prioridad) + '</td>' +
+      '<td><button class="btn btn-outline-secondary btn-sm py-0" onclick="abrirParte(\'' + i.idParte + '\')"><i class="bi bi-box-arrow-up-right"></i></button></td>' +
+    '</tr>';
+  }).join('');
+}
+
 // ══════════════════════════════════════════════════════
 //  HISTÓRICO
 // ══════════════════════════════════════════════════════
 
 function cargarHistorico() {
-  llamar('listPartes', [], 'Cargando histórico…', function(partes) {
+  llamar('listPartesConConteo', [], 'Cargando histórico…', function(partes) {
     APP.histAllPartes = partes || [];
     filtrarHistorico();
   });
@@ -1312,14 +1688,15 @@ function filtrarHistorico() {
       '<td class="small">' + fmtDT(p.fechaFin)    + '</td>' +
       '<td class="small">' + (p.tipoPeriodo||'—')  + '</td>' +
       '<td class="small">' + truncar(p.profesionales, 30) + '</td>' +
-      '<td class="text-center">—</td>' +
+      '<td class="text-center small">' + (p.numIncidencias !== undefined ? p.numIncidencias : '—') + '</td>' +
       '<td>' + badgeEstado(p.estado) + '</td>' +
       '<td class="small text-muted">' + (p.creadoPor||'—') + '</td>' +
       '<td class="text-end">' +
         '<button class="btn btn-outline-primary btn-sm py-0 me-1" onclick="abrirParte(\'' + p.id + '\')" title="Ver"><i class="bi bi-eye"></i></button>' +
         (canEdit ? '<button class="btn btn-outline-secondary btn-sm py-0 me-1" onclick="abrirModalParte(\'' + p.id + '\')" title="Editar"><i class="bi bi-pencil"></i></button>' : '') +
         btnsCerrar +
-        (canEdit ? '<button class="btn btn-outline-secondary btn-sm py-0" onclick="confirmarDuplicar(\'' + p.id + '\')" title="Duplicar"><i class="bi bi-copy"></i></button>' : '') +
+        (canEdit ? '<button class="btn btn-outline-secondary btn-sm py-0 me-1" onclick="confirmarDuplicar(\'' + p.id + '\')" title="Duplicar"><i class="bi bi-copy"></i></button>' : '') +
+        (APP.user && APP.user.rol === 'admin' ? '<button class="btn btn-outline-danger btn-sm py-0" onclick="confirmarEliminarParte(\'' + p.id + '\')" title="Eliminar parte"><i class="bi bi-trash3"></i></button>' : '') +
       '</td>' +
     '</tr>';
   }).join('');
@@ -1355,8 +1732,10 @@ function abrirParte(id) {
     var canEdit = APP.user && (APP.user.rol==='admin' || APP.user.rol==='editor');
     var cerrado = p.estado === 'cerrado';
 
-    document.getElementById('btn-editar-parte').style.display  = canEdit ? '' : 'none';
-    document.getElementById('btn-cerrar-parte').style.display  = (canEdit && !cerrado) ? '' : 'none';
+    var isAdmin = APP.user && APP.user.rol === 'admin';
+    document.getElementById('btn-editar-parte').style.display   = canEdit ? '' : 'none';
+    document.getElementById('btn-cerrar-parte').style.display   = (canEdit && !cerrado) ? '' : 'none';
+    document.getElementById('btn-reabrir-parte').style.display  = (isAdmin && cerrado) ? '' : 'none';
     document.getElementById('btn-nueva-incidencia').style.display = canEdit ? '' : 'none';
 
     APP.parteIncidencias = data.incidencias || [];
@@ -1385,10 +1764,23 @@ function renderIncidencias() {
     return;
   }
 
+  var estadosOpts = ['abierta','resuelta','informativa','cerrada'];
+
   cont.innerHTML = lista.map(function(inc) {
     var prioClass = 'prio-' + (inc.prioridad||'media').replace('í','i');
-    var btns = canEdit
-      ? '<button class="btn btn-outline-secondary btn-sm py-0 me-1" onclick="abrirModalIncidencia(\'' + inc.id + '\')" title="Editar"><i class="bi bi-pencil"></i></button>'
+
+    var isAdmin = APP.user && APP.user.rol === 'admin';
+    var acciones = canEdit
+      ? '<button class="btn btn-outline-secondary btn-sm py-0" onclick="abrirModalIncidencia(\'' + inc.id + '\')" title="Editar"><i class="bi bi-pencil"></i></button>' +
+        (isAdmin
+          ? ' <button class="btn btn-outline-danger btn-sm py-0" onclick="eliminarIncidencia(\'' + inc.id + '\')" title="Eliminar (admin)"><i class="bi bi-trash3"></i></button>'
+          : '') +
+        '<select class="form-select form-select-sm mt-1" style="font-size:.72rem;padding:.15rem .4rem;" ' +
+          'onchange="cambiarEstadoIncidencia(\'' + inc.id + '\', this.value)" title="Cambiar estado">' +
+          estadosOpts.map(function(e) {
+            return '<option value="' + e + '"' + (inc.estado === e ? ' selected' : '') + '>' + e + '</option>';
+          }).join('') +
+        '</select>'
       : '';
 
     return '<div class="inc-card ' + prioClass + '">' +
@@ -1398,7 +1790,7 @@ function renderIncidencias() {
             '<span class="text-muted small"><i class="bi bi-clock me-1"></i>' + fmtDT(inc.fechaEvento) + '</span>' +
             '<span class="badge bg-light text-dark border small">' + (inc.area||'—') + '</span>' +
             '<span class="badge bg-light text-dark border small">' + (inc.tipoEntrada||'—') + '</span>' +
-            badgePrio(inc.prioridad) + ' ' + badgeEstado(inc.estado) +
+            badgePrio(inc.prioridad) +
           '</div>' +
           '<p class="mb-1 small fw-semibold">' + escHtml(inc.descripcion||'—') + '</p>' +
           (inc.actuacion ? '<p class="mb-1 small text-muted"><i class="bi bi-arrow-return-right me-1"></i>' + escHtml(truncar(inc.actuacion, 200)) + '</p>' : '') +
@@ -1406,14 +1798,43 @@ function renderIncidencias() {
           (inc.servicio ? '<p class="mb-0 small text-muted"><i class="bi bi-building me-1"></i>' + escHtml(inc.servicio) + '</p>' : '') +
           (inc.seguimiento ? '<p class="mb-0 small text-warning-emphasis"><i class="bi bi-arrow-right-circle me-1"></i>' + escHtml(truncar(inc.seguimiento,150)) + '</p>' : '') +
         '</div>' +
-        '<div class="d-flex flex-column align-items-end gap-1">' +
-          btns +
-          '<span class="text-muted" style="font-size:.72rem;">' + (inc.registradoPor||'—') + '</span>' +
+        '<div class="d-flex flex-column align-items-end gap-1" style="min-width:90px;">' +
+          acciones +
+          '<span class="text-muted mt-1" style="font-size:.72rem;">' + (inc.registradoPor||'—') + '</span>' +
           (inc.tieneAdjuntos ? '<span class="small text-secondary"><i class="bi bi-paperclip"></i> adj.</span>' : '') +
         '</div>' +
       '</div>' +
     '</div>';
   }).join('');
+}
+
+function cambiarEstadoIncidencia(incId, nuevoEstado) {
+  llamarW('updateEstadoIncidencia', [incId, nuevoEstado], null, function() {
+    var inc = APP.parteIncidencias.find(function(i){ return i.id === incId; });
+    if (inc) inc.estado = nuevoEstado;
+    toast('Estado actualizado: ' + nuevoEstado, 'success');
+  });
+}
+
+function eliminarIncidencia(incId) {
+  confirmar('Eliminar incidencia',
+    '¿Eliminar definitivamente esta incidencia y sus adjuntos? Esta acción no se puede deshacer.',
+    function() {
+      llamarW('deleteIncidencia', [incId], 'Eliminando…', function(_, msg) {
+        toast(msg || 'Incidencia eliminada.', 'success');
+        APP.parteIncidencias = APP.parteIncidencias.filter(function(i){ return i.id !== incId; });
+        renderIncidencias();
+      });
+    });
+}
+
+function imprimirParte() {
+  llamar('getParteHTML', [APP.currentParteId], 'Preparando…', function(res) {
+    var win = window.open('', '_blank');
+    win.document.write(res.html);
+    win.document.close();
+    setTimeout(function() { win.print(); }, 500);
+  });
 }
 
 function escHtml(s) {
@@ -1423,8 +1844,17 @@ function escHtml(s) {
 
 function cerrarParte() {
   confirmar('Cerrar parte', '¿Cerrar este parte? No podrá ser editado por usuarios no administradores.', function() {
-    llamar('closeParte', [APP.currentParteId], 'Cerrando…', function() {
+    llamarW('closeParte', [APP.currentParteId], 'Cerrando…', function() {
       toast('Parte cerrado correctamente.', 'success');
+      abrirParte(APP.currentParteId);
+    });
+  });
+}
+
+function reabrirParte() {
+  confirmar('Reabrir parte', '¿Reabrir este parte cerrado? Quedará en estado Borrador y podrá editarse.', function() {
+    llamarW('reopenParte', [APP.currentParteId], 'Reabriendo…', function() {
+      toast('Parte reabierto correctamente.', 'success');
       abrirParte(APP.currentParteId);
     });
   });
@@ -1432,7 +1862,7 @@ function cerrarParte() {
 
 function duplicarParte() {
   confirmar('Duplicar parte', '¿Crear un nuevo parte copiando los datos de éste?', function() {
-    llamar('duplicateParte', [APP.currentParteId], 'Duplicando…', function(data) {
+    llamarW('duplicateParte', [APP.currentParteId], 'Duplicando…', function(data) {
       toast('Parte duplicado: ' + data.id, 'success');
       abrirParte(data.id);
     });
@@ -1441,7 +1871,7 @@ function duplicarParte() {
 
 function confirmarCerrarParte(id) {
   confirmar('Cerrar parte', '¿Cerrar el parte ' + id + '?', function() {
-    llamar('closeParte', [id], 'Cerrando…', function() {
+    llamarW('closeParte', [id], 'Cerrando…', function() {
       toast('Parte ' + id + ' cerrado.', 'success');
       cargarHistorico();
     });
@@ -1450,11 +1880,23 @@ function confirmarCerrarParte(id) {
 
 function confirmarDuplicar(id) {
   confirmar('Duplicar parte', '¿Crear un nuevo parte copiando ' + id + '?', function() {
-    llamar('duplicateParte', [id], 'Duplicando…', function(data) {
+    llamarW('duplicateParte', [id], 'Duplicando…', function(data) {
       toast('Parte duplicado: ' + data.id, 'success');
       abrirParte(data.id);
     });
   });
+}
+
+function confirmarEliminarParte(id) {
+  confirmar('Eliminar parte',
+    '¿Eliminar definitivamente el parte ' + id + ' y TODAS sus incidencias y adjuntos? Esta acción no se puede deshacer.',
+    function() {
+      llamarW('deleteParte', [id], 'Eliminando…', function(_, msg) {
+        toast(msg || 'Parte eliminado.', 'success');
+        APP.histAllPartes = APP.histAllPartes.filter(function(p){ return p.id !== id; });
+        filtrarHistorico();
+      });
+    });
 }
 
 </script>
@@ -1527,14 +1969,14 @@ function guardarParte() {
   };
 
   if (id) {
-    llamar('updateParte', [id, data], 'Guardando…', function(res, msg) {
+    llamarW('updateParte', [id, data], 'Guardando…', function(res, msg) {
       APP.modalParteInst.hide();
       toast(msg || 'Parte actualizado.', 'success');
       if (APP.currentParteId === id) abrirParte(id);
       else cargarHistorico();
     });
   } else {
-    llamar('createParte', [data], 'Creando parte…', function(res, msg) {
+    llamarW('createParte', [data], 'Creando parte…', function(res, msg) {
       APP.modalParteInst.hide();
       toast(msg || 'Parte creado.', 'success');
       abrirParte(res.id);
@@ -1658,9 +2100,9 @@ function guardarIncidencia() {
   };
 
   if (id) {
-    llamar('updateIncidencia', [id, data], 'Guardando…', onDone);
+    llamarW('updateIncidencia', [id, data], 'Guardando…', onDone);
   } else {
-    llamar('createIncidencia', [data], 'Registrando incidencia…', onDone);
+    llamarW('createIncidencia', [data], 'Registrando incidencia…', onDone);
   }
 }
 
@@ -1700,7 +2142,7 @@ function subirAdjunto() {
   var reader = new FileReader();
   reader.onload = function(e) {
     var b64 = e.target.result.split(',')[1];
-    llamar('uploadAdjunto', [incId, parteId, file.name, b64, file.type],
+    llamarW('uploadAdjunto', [incId, parteId, file.name, b64, file.type],
       'Subiendo archivo…', function(res, msg) {
         toast(msg || 'Archivo subido.', 'success');
         input.value = '';
@@ -1714,7 +2156,7 @@ function subirAdjunto() {
 function eliminarAdjunto(adjId) {
   confirmar('Eliminar adjunto', '¿Eliminar este adjunto? También se moverá a la papelera de Drive.', function() {
     var incId = document.getElementById('mi-id').value.trim();
-    llamar('deleteAdjunto', [adjId], 'Eliminando…', function(_, msg) {
+    llamarW('deleteAdjunto', [adjId], 'Eliminando…', function(_, msg) {
       toast(msg || 'Adjunto eliminado.', 'success');
       if (incId) cargarAdjuntosModal(incId);
     });
@@ -1743,7 +2185,7 @@ function initBusqueda() {
 }
 
 function limpiarBusqueda() {
-  ['bq-texto','bq-desde','bq-hasta','bq-medicamento','bq-servicio','bq-registrado'].forEach(function(id) {
+  ['bq-texto','bq-desde','bq-hasta','bq-medicamento','bq-servicio','bq-registrado','bq-profesional'].forEach(function(id) {
     document.getElementById(id).value = '';
   });
   ['bq-parte','bq-area','bq-tipo','bq-prioridad','bq-estado','bq-adjuntos'].forEach(function(id) {
@@ -1767,8 +2209,9 @@ function buscar(page) {
     servicio:      document.getElementById('bq-servicio').value.trim()    || undefined,
     prioridad:     document.getElementById('bq-prioridad').value          || undefined,
     estado:        document.getElementById('bq-estado').value             || undefined,
-    registradoPor: document.getElementById('bq-registrado').value.trim()  || undefined,
-    conAdjuntos:   document.getElementById('bq-adjuntos').value === 'si' ? true : undefined,
+    registradoPor:      document.getElementById('bq-registrado').value.trim()   || undefined,
+    profesionalGuardia: document.getElementById('bq-profesional').value.trim()  || undefined,
+    conAdjuntos:        document.getElementById('bq-adjuntos').value === 'si' ? true : undefined,
     page: page, pageSize: 25
   };
 
@@ -2041,6 +2484,170 @@ function renderChartArray(canvasId, tipo, arrayData, color) {
   var etiquetas = arrayData.map(function(d){ return d.etiqueta; });
   var valores   = arrayData.map(function(d){ return d.valor; });
   renderChartRaw(canvasId, tipo, etiquetas, valores, color);
+}
+
+// ══════════════════════════════════════════════════════
+//  GESTIÓN DE USUARIOS (solo admin)
+// ══════════════════════════════════════════════════════
+
+function cargarUsuarios() {
+  llamarW('getUsuarios', [], 'Cargando usuarios…', function(usuarios) {
+    var tbody = document.getElementById('usuarios-body');
+    if (!usuarios || !usuarios.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">Sin usuarios registrados.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = usuarios.map(function(u) {
+      var activoBadge = u.activo
+        ? '<span class="badge badge-estado-resuelta">Activo</span>'
+        : '<span class="badge badge-estado-cerrada">Inactivo</span>';
+      var rolBadge = '<span class="badge ' +
+        (u.rol === 'admin' ? 'bg-danger' : u.rol === 'editor' ? 'bg-primary' : 'bg-secondary') +
+        '">' + u.rol + '</span>';
+      var esYo = APP.user && u.email === APP.user.email;
+      return '<tr>' +
+        '<td class="small fw-semibold">' + escHtml(u.email) + (esYo ? ' <span class="text-muted">(tú)</span>' : '') + '</td>' +
+        '<td class="small">' + escHtml(u.nombre || '—') + '</td>' +
+        '<td>' + rolBadge + '</td>' +
+        '<td>' + activoBadge + '</td>' +
+        '<td class="small text-muted">' + fmtD(u.fechaAlta) + '</td>' +
+        '<td class="text-end">' +
+          '<select class="form-select form-select-sm d-inline-block me-1" style="width:auto;" ' +
+            'onchange="cambiarRolUsuario(\'' + escHtml(u.email) + '\', this.value)" ' +
+            (esYo ? 'disabled ' : '') + '>' +
+            ['lector','editor','admin'].map(function(r) {
+              return '<option value="' + r + '"' + (u.rol === r ? ' selected' : '') + '>' + r + '</option>';
+            }).join('') +
+          '</select>' +
+          (!esYo
+            ? '<button class="btn btn-sm ' + (u.activo ? 'btn-outline-warning' : 'btn-outline-success') + ' py-0" ' +
+              'onclick="toggleUsuarioActivo(\'' + escHtml(u.email) + '\')" title="' + (u.activo ? 'Desactivar' : 'Activar') + '">' +
+              '<i class="bi bi-' + (u.activo ? 'person-dash' : 'person-check') + '"></i></button>'
+            : '') +
+        '</td>' +
+      '</tr>';
+    }).join('');
+  });
+}
+
+function abrirModalAddUser() {
+  document.getElementById('au-email').value    = '';
+  document.getElementById('au-nombre').value   = '';
+  document.getElementById('au-rol').value      = 'lector';
+  document.getElementById('au-password').value = '';
+  APP.modalAddUserInst.show();
+}
+
+function guardarNuevoUsuario() {
+  var email = document.getElementById('au-email').value.trim().toLowerCase();
+  var nombre= document.getElementById('au-nombre').value.trim();
+  var rol   = document.getElementById('au-rol').value;
+  var pass  = document.getElementById('au-password').value;
+  if (!email)  { toast('El email es obligatorio.', 'warning'); return; }
+  if (!nombre) { toast('El nombre es obligatorio.', 'warning'); return; }
+  if (!pass || pass.length < 4) { toast('La contraseña debe tener al menos 4 caracteres.', 'warning'); return; }
+  llamarW('addUsuario', [email, nombre, rol, pass], 'Creando usuario…', function(_, msg) {
+    APP.modalAddUserInst.hide();
+    toast(msg || 'Usuario creado.', 'success');
+    cargarUsuarios();
+  });
+}
+
+function cambiarRolUsuario(email, nuevoRol) {
+  llamarW('updateUsuarioRol', [email, nuevoRol], 'Actualizando rol…', function(_, msg) {
+    toast(msg || 'Rol actualizado.', 'success');
+  });
+}
+
+function toggleUsuarioActivo(email) {
+  llamarW('toggleUsuarioActivo', [email], 'Actualizando…', function(_, msg) {
+    toast(msg || 'Usuario actualizado.', 'success');
+    cargarUsuarios();
+  });
+}
+
+// ══════════════════════════════════════════════════════
+//  GESTIÓN DE CATÁLOGOS (solo admin)
+// ══════════════════════════════════════════════════════
+
+var CAT_TIPO_LABELS = { Area:'Área', TipoEntrada:'Tipo de entrada', TipoPeriodo:'Tipo de periodo', Prioridad:'Prioridad' };
+
+function cargarCatalogosAdmin() {
+  llamarW('getCatalogosAdmin', [], 'Cargando catálogos…', function(items) {
+    var cont = document.getElementById('cat-container');
+    if (!items || !items.length) {
+      cont.innerHTML = '<p class="text-muted text-center py-3">No hay ítems en el catálogo todavía.</p>';
+      return;
+    }
+
+    // Agrupar por tipo
+    var grupos = {};
+    items.forEach(function(it) {
+      if (!grupos[it.tipo]) grupos[it.tipo] = [];
+      grupos[it.tipo].push(it);
+    });
+
+    cont.innerHTML = Object.keys(grupos).map(function(tipo) {
+      var lista = grupos[tipo];
+      var filas = lista.map(function(it) {
+        return '<tr class="' + (!it.activo ? 'text-muted' : '') + '">' +
+          '<td class="small">' + escHtml(it.valor) + '</td>' +
+          '<td class="small text-muted">' + escHtml(it.descripcion || '—') + '</td>' +
+          '<td>' + (it.activo
+            ? '<span class="badge badge-estado-resuelta">Activo</span>'
+            : '<span class="badge badge-estado-cerrada">Inactivo</span>') + '</td>' +
+          '<td class="text-end">' +
+            '<button class="btn btn-sm ' + (it.activo ? 'btn-outline-warning' : 'btn-outline-success') + ' py-0" ' +
+              'onclick="toggleItemCatalogo(\'' + escHtml(it.tipo) + '\',\'' + escHtml(it.valor) + '\')">' +
+              (it.activo ? 'Desactivar' : 'Activar') +
+            '</button>' +
+          '</td>' +
+        '</tr>';
+      }).join('');
+
+      return '<div class="table-card mb-3">' +
+        '<div class="d-flex align-items-center px-3 py-2 border-bottom">' +
+          '<span class="fw-semibold small">' + (CAT_TIPO_LABELS[tipo] || tipo) + '</span>' +
+          '<span class="badge bg-secondary ms-2">' + lista.length + '</span>' +
+        '</div>' +
+        '<div class="table-responsive">' +
+          '<table class="table table-hover mb-0">' +
+          '<thead><tr><th>Valor</th><th>Descripción</th><th>Estado</th><th></th></tr></thead>' +
+          '<tbody>' + filas + '</tbody>' +
+          '</table>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  });
+}
+
+function agregarItemCatalogo() {
+  var tipo  = document.getElementById('cat-nuevo-tipo').value;
+  var valor = document.getElementById('cat-nuevo-valor').value.trim();
+  var desc  = document.getElementById('cat-nuevo-desc').value.trim();
+  if (!valor) { toast('El valor es obligatorio.', 'warning'); return; }
+  llamarW('addCatalogItem', [tipo, valor, desc], 'Añadiendo…', function(_, msg) {
+    toast(msg || 'Ítem añadido.', 'success');
+    document.getElementById('cat-nuevo-valor').value = '';
+    document.getElementById('cat-nuevo-desc').value  = '';
+    cargarCatalogosAdmin();
+    // Recarga catálogos en selectores de la app
+    llamar('getCatalogos', [], null, function(cat) {
+      APP.catalogos = cat;
+      poblarSelectoresCatalogos();
+    });
+  });
+}
+
+function toggleItemCatalogo(tipo, valor) {
+  llamarW('toggleCatalogItem', [tipo, valor], null, function(_, msg) {
+    toast(msg || 'Ítem actualizado.', 'success');
+    cargarCatalogosAdmin();
+    llamar('getCatalogos', [], null, function(cat) {
+      APP.catalogos = cat;
+      poblarSelectoresCatalogos();
+    });
+  });
 }
 
 function renderChartRaw(canvasId, tipo, etiquetas, valores, colores) {

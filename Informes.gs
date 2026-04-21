@@ -189,6 +189,101 @@ function exportInformeCSV(params) {
 }
 
 /**
+ * Genera el HTML imprimible de un único parte de guardia (para imprimir desde el detalle).
+ * @param {string} parteId
+ */
+function getParteHTML(parteId) {
+  try {
+    var r = getParteConIncidencias(parteId);
+    if (!r.success) return r;
+    var p    = r.data.parte;
+    var incs = r.data.incidencias || [];
+    incs.sort(function(a, b) { return new Date(a.fechaEvento) - new Date(b.fechaEvento); });
+
+    var fmtDate  = function(iso) { return iso ? formatDateTime(new Date(iso)) : '—'; };
+    var fmtDateS = function(iso) { return iso ? formatDateShort(new Date(iso)) : '—'; };
+
+    var colorPrio = function(prio) {
+      return { baja:'#34a853', media:'#fbbc04', alta:'#fa7b17', 'crítica':'#ea4335' }[prio] || '#9e9e9e';
+    };
+    var badgePrioHTML = function(prio) {
+      return '<span style="background:' + colorPrio(prio) + ';color:#fff;padding:2px 7px;border-radius:3px;font-size:10px;font-weight:600">' + (prio || '—') + '</span>';
+    };
+    var badgeEstadoHTML = function(e) {
+      var map = { borrador:'#9e9e9e', cerrado:'#3c4043', abierta:'#fbbc04', resuelta:'#34a853', informativa:'#4285f4', cerrada:'#9e9e9e' };
+      return '<span style="background:' + (map[e]||'#9e9e9e') + ';color:#fff;padding:2px 7px;border-radius:3px;font-size:10px">' + (e || '—') + '</span>';
+    };
+
+    var incidenciasHTML;
+    if (!incs.length) {
+      incidenciasHTML = '<p style="color:#888;font-style:italic;font-size:11px">Sin incidencias registradas en este parte.</p>';
+    } else {
+      var filas = incs.map(function(inc) {
+        return '<tr>' +
+          '<td>' + fmtDate(inc.fechaEvento)     + '</td>' +
+          '<td>' + (inc.area       || '—')       + '</td>' +
+          '<td>' + (inc.tipoEntrada|| '—')       + '</td>' +
+          '<td>' + (inc.descripcion|| '—')       + '</td>' +
+          '<td>' + (inc.actuacion  || '—')       + '</td>' +
+          '<td>' + (inc.medicamentos||'—')       + '</td>' +
+          '<td>' + (inc.servicio   || '—')       + '</td>' +
+          '<td>' + badgePrioHTML(inc.prioridad)  + '</td>' +
+          '<td>' + badgeEstadoHTML(inc.estado)   + '</td>' +
+          '<td>' + (inc.registradoPor||'—')      + '</td>' +
+          '<td><em>' + (inc.seguimiento||'—')    + '</em></td>' +
+        '</tr>';
+      }).join('');
+      incidenciasHTML =
+        '<table style="width:100%;border-collapse:collapse;font-size:10px">' +
+        '<thead><tr style="background:#e8f0fe">' +
+          '<th>Fecha</th><th>Área</th><th>Tipo</th><th>Descripción</th>' +
+          '<th>Actuación</th><th>Medicamentos</th><th>Servicio</th>' +
+          '<th>Prioridad</th><th>Estado</th><th>Registrado por</th><th>Seguimiento</th>' +
+        '</tr></thead><tbody>' + filas + '</tbody></table>';
+    }
+
+    var estadoColor = p.estado === 'cerrado' ? '#3c4043' : '#e8a000';
+    var html =
+      '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">' +
+      '<title>Parte ' + p.id + '</title>' +
+      '<style>' +
+        'body{font-family:Arial,sans-serif;font-size:11px;margin:20px;color:#202124}' +
+        'h1{font-size:16px;color:#1a73e8;margin-bottom:2px}' +
+        'table thead th{padding:5px 6px;text-align:left;font-size:10px;font-weight:600;white-space:nowrap}' +
+        'table tbody td{padding:4px 6px;border-bottom:1px solid #f1f3f4;vertical-align:top}' +
+        'table tbody tr:nth-child(even){background:#f8f9fa}' +
+        '.meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:10px 0;font-size:11px}' +
+        '.meta-lbl{color:#5f6368;font-size:10px}' +
+        '@media print{button{display:none!important}}' +
+      '</style></head><body>' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start">' +
+        '<div>' +
+          '<h1>Parte de Guardia · ' + p.id + '</h1>' +
+          '<span style="background:' + estadoColor + ';color:#fff;padding:2px 10px;border-radius:3px;font-size:11px">' + (p.estado||'—') + '</span>' +
+        '</div>' +
+        '<div style="text-align:right;font-size:10px;color:#5f6368">' +
+          'Generado el ' + fmtDate(new Date().toISOString()) + '</div>' +
+      '</div>' +
+      '<div class="meta-grid">' +
+        '<div><div class="meta-lbl">Periodo</div>' + fmtDateS(p.fechaInicio) + ' → ' + fmtDateS(p.fechaFin) + '</div>' +
+        '<div><div class="meta-lbl">Tipo de periodo</div>' + (p.tipoPeriodo||'—') + '</div>' +
+        '<div><div class="meta-lbl">Profesionales de guardia</div>' + (p.profesionales||'No indicados') + '</div>' +
+        '<div><div class="meta-lbl">Creado por / Fecha</div>' + (p.creadoPor||'—') + ' · ' + fmtDate(p.fechaCreacion) + '</div>' +
+        (p.observaciones ? '<div style="grid-column:1/-1"><div class="meta-lbl">Observaciones</div><em>' + p.observaciones + '</em></div>' : '') +
+      '</div>' +
+      '<hr style="border:none;border-top:1px solid #dadce0;margin:10px 0">' +
+      '<h2 style="font-size:12px;margin:0 0 6px">' + incs.length + ' incidencia' + (incs.length !== 1 ? 's' : '') + '</h2>' +
+      incidenciasHTML +
+      '</body></html>';
+
+    return ok({ html: html });
+  } catch (e) {
+    logErr('getParteHTML', e);
+    return fail(e.message);
+  }
+}
+
+/**
  * Genera el HTML imprimible del informe (organizado por parte, para PDF).
  */
 function getInformeHTML(params) {

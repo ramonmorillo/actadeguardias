@@ -37,12 +37,23 @@ function toISO(date) {
 
 // ── Usuario activo ─────────────────────────────────────────────────────────
 
-function getCurrentUser() {
+/**
+ * Devuelve el email del usuario activo.
+ * Con el sistema de login interno, recibe el token de sesión.
+ * Mantiene fallback a Session.getActiveUser() para ejecuciones directas desde el editor.
+ * @param {string} [token]
+ */
+function getCurrentUser(token) {
+  if (token) {
+    var user = getSessionUser(token);
+    if (user) return user.email;
+  }
+  // Fallback: ejecución directa desde el editor de Apps Script (p.ej. inicializarAplicacion)
   try {
     var email = Session.getActiveUser().getEmail();
-    return email || 'desconocido';
+    return email || 'script-admin';
   } catch (e) {
-    return 'desconocido';
+    return 'script-admin';
   }
 }
 

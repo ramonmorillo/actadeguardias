@@ -5,7 +5,7 @@
 
 var HEADERS = {
   CONFIG:      ['Clave', 'Valor', 'Descripcion'],
-  USUARIOS:    ['Email', 'Nombre', 'Rol', 'Activo', 'FechaAlta'],
+  USUARIOS:    ['Email', 'Nombre', 'Rol', 'Activo', 'Password', 'FechaAlta'],
   PARTES:      ['ID', 'FechaInicio', 'FechaFin', 'TipoPeriodo', 'Profesionales',
                 'CreadoPor', 'FechaCreacion', 'UltimaModificacion', 'ModificadoPor',
                 'Estado', 'Observaciones'],
@@ -82,12 +82,25 @@ function addSampleData() {
 function addSampleUsuarios(ss) {
   var sheet = ss.getSheetByName(CONFIG.SHEETS.USUARIOS);
   if (sheet.getLastRow() > 1) return;
-  sheet.getRange(2, 1, 4, 5).setValues([
-    ['admin@farmacia.es',          'Administrador Farmacia',  'admin',  true, new Date()],
-    ['farmaceutico1@farmacia.es',  'Ana García López',        'editor', true, new Date()],
-    ['farmaceutico2@farmacia.es',  'Carlos Martínez Ruiz',   'editor', true, new Date()],
-    ['tecnico1@farmacia.es',       'María Fernández Díaz',   'lector', true, new Date()]
+  // Columnas: Email, Nombre, Rol, Activo, Password, FechaAlta
+  // AVISO: contraseñas en texto plano solo para demo. Cambiarlas en producción.
+  sheet.getRange(2, 1, 4, 6).setValues([
+    ['admin@farmacia.es',         'Administrador Farmacia', 'admin',  true, 'Admin1234',   new Date()],
+    ['farmaceutico1@farmacia.es', 'Ana García López',       'editor', true, 'Farmacia1',   new Date()],
+    ['farmaceutico2@farmacia.es', 'Carlos Martínez Ruiz',  'editor', true, 'Farmacia2',   new Date()],
+    ['tecnico1@farmacia.es',      'María Fernández Díaz',  'lector', true, 'Tecnico1',    new Date()]
   ]);
+}
+
+/**
+ * Utilidad para añadir o actualizar la contraseña de un usuario desde el editor.
+ * Ejecutar manualmente desde el editor de Apps Script si hace falta resetear.
+ */
+function resetearPasswordManual(email, nuevaPassword) {
+  var result = findRow(CONFIG.SHEETS.USUARIOS, COLS.USUARIOS.EMAIL, email.toLowerCase());
+  if (!result) throw new Error('Usuario no encontrado: ' + email);
+  setCellValue(CONFIG.SHEETS.USUARIOS, result.rowIndex, COLS.USUARIOS.PASSWORD, nuevaPassword);
+  console.log('Contraseña actualizada para: ' + email);
 }
 
 function addSamplePartes(ss) {
@@ -199,6 +212,74 @@ function addSampleIncidencias(ss, id1, id2, sab1, sab2) {
   ];
 
   sheet.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
+}
+
+// ── Gestión de catálogos (admin) ──────────────────────────────────────────
+
+/** Devuelve todos los ítems del catálogo (activos e inactivos) para el panel de admin. */
+function getCatalogosAdmin(token) {
+  try {
+    requireAdminPermission(token);
+    var data = getAllRaw(CONFIG.SHEETS.CATALOGOS);
+    if (data.length <= 1) return ok([]);
+    var items = [];
+    for (var i = 1; i < data.length; i++) {
+      var row = data[i];
+      if (!row[COLS.CATALOGOS.TIPO]) continue;
+      items.push({
+        rowIndex:   i + 1,
+        tipo:       row[COLS.CATALOGOS.TIPO],
+        valor:      row[COLS.CATALOGOS.VALOR],
+        descripcion:row[COLS.CATALOGOS.DESCRIPCION],
+        activo:     !!row[COLS.CATALOGOS.ACTIVO],
+        orden:      row[COLS.CATALOGOS.ORDEN]
+      });
+    }
+    return ok(items);
+  } catch (e) {
+    logErr('getCatalogosAdmin', e);
+    return fail(e.message);
+  }
+}
+
+/** Añade un nuevo ítem al catálogo. */
+function addCatalogItem(token, tipo, valor, descripcion) {
+  try {
+    requireAdminPermission(token);
+    if (!tipo || !valor) throw new Error('Tipo y valor son obligatorios.');
+    // Calcular siguiente orden dentro del tipo
+    var data = getAllRaw(CONFIG.SHEETS.CATALOGOS);
+    var maxOrden = 0;
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][COLS.CATALOGOS.TIPO] === tipo) {
+        maxOrden = Math.max(maxOrden, data[i][COLS.CATALOGOS.ORDEN] || 0);
+      }
+    }
+    appendRow(CONFIG.SHEETS.CATALOGOS, [tipo, valor, descripcion || '', true, maxOrden + 1]);
+    return ok(null, 'Ítem añadido al catálogo.');
+  } catch (e) {
+    logErr('addCatalogItem', e);
+    return fail(e.message);
+  }
+}
+
+/** Activa o desactiva un ítem del catálogo buscando por tipo + valor exacto. */
+function toggleCatalogItem(token, tipo, valor) {
+  try {
+    requireAdminPermission(token);
+    var data = getAllRaw(CONFIG.SHEETS.CATALOGOS);
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][COLS.CATALOGOS.TIPO] === tipo && data[i][COLS.CATALOGOS.VALOR] === valor) {
+        var current = !!data[i][COLS.CATALOGOS.ACTIVO];
+        setCellValue(CONFIG.SHEETS.CATALOGOS, i + 1, COLS.CATALOGOS.ACTIVO, !current);
+        return ok(null, current ? 'Ítem desactivado.' : 'Ítem activado.');
+      }
+    }
+    return fail('Ítem no encontrado.');
+  } catch (e) {
+    logErr('toggleCatalogItem', e);
+    return fail(e.message);
+  }
 }
 
 // ── Catálogos accesibles desde cliente ────────────────────────────────────

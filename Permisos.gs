@@ -1,9 +1,12 @@
 /**
  * Gestión de usuarios, roles y permisos.
- * Roles: admin > editor > lector.
+ * Todas las funciones que modifican datos aceptan un token de sesión como primer parámetro.
+ * Las funciones de consulta de rol trabajan directamente con email (son helpers internos).
+ *
+ * getCurrentUserInfo() se ha movido a Sesion.gs.
  */
 
-// ── Consulta de rol ────────────────────────────────────────────────────────
+// ── Helpers de rol (internos, basados en email) ────────────────────────────
 
 function getUserRole(email) {
   if (!email) return null;
@@ -15,65 +18,61 @@ function getUserRole(email) {
 }
 
 function isAdmin(email) {
-  return getUserRole(email || getCurrentUser()) === CONFIG.ROLES.ADMIN;
+  return getUserRole(email) === CONFIG.ROLES.ADMIN;
 }
 
 function canEdit(email) {
-  var role = getUserRole(email || getCurrentUser());
+  var role = getUserRole(email);
   return role === CONFIG.ROLES.ADMIN || role === CONFIG.ROLES.EDITOR;
 }
 
-/** Lanza excepción si el usuario activo no puede editar. */
-function requireEditPermission() {
-  if (!canEdit(getCurrentUser())) {
+// ── Guardias de permiso (usan token) ──────────────────────────────────────
+
+/**
+ * Lanza excepción si el usuario de la sesión no puede editar.
+ * @param {string} token  Token de sesión devuelto por loginUsuario().
+ * @returns {{email,nombre,rol}}  El usuario validado (para reutilizar en la llamada).
+ */
+function requireEditPermission(token) {
+  var user = getSessionUser(token);
+  if (!user) throw new Error('Sesión no válida o expirada. Vuelve a iniciar sesión.');
+  if (!canEdit(user.email)) {
     throw new Error('No tienes permisos de edición. Contacta con el administrador.');
   }
+  return user;
 }
 
-// ── API pública ────────────────────────────────────────────────────────────
-
-/** Devuelve la información del usuario activo (auto-registra como lector si es nuevo). */
-function getCurrentUserInfo() {
-  try {
-    var email = getCurrentUser();
-    var result = findRow(CONFIG.SHEETS.USUARIOS, COLS.USUARIOS.EMAIL, email);
-    if (!result) {
-      // Auto-registro con rol lector
-      appendRow(CONFIG.SHEETS.USUARIOS, [
-        email,
-        email.split('@')[0].replace(/[._]/g, ' '),
-        CONFIG.ROLES.LECTOR,
-        true,
-        new Date()
-      ]);
-      return ok({ email: email, nombre: email.split('@')[0], rol: CONFIG.ROLES.LECTOR, activo: true });
-    }
-    var row = result.row;
-    return ok({
-      email:  row[COLS.USUARIOS.EMAIL],
-      nombre: row[COLS.USUARIOS.NOMBRE],
-      rol:    row[COLS.USUARIOS.ROL],
-      activo: row[COLS.USUARIOS.ACTIVO]
-    });
-  } catch (e) {
-    logErr('getCurrentUserInfo', e);
-    return fail(e.message);
+/**
+ * Lanza excepción si el usuario de la sesión no es administrador.
+ */
+function requireAdminPermission(token) {
+  var user = getSessionUser(token);
+  if (!user) throw new Error('Sesión no válida o expirada. Vuelve a iniciar sesión.');
+  if (user.rol !== CONFIG.ROLES.ADMIN) {
+    throw new Error('Solo los administradores pueden realizar esta acción.');
   }
+  return user;
 }
 
-function getUsuarios() {
+// ── API de usuarios (requieren token) ─────────────────────────────────────
+
+function getUsuarios(token) {
   try {
+    if (!getSessionUser(token)) return fail('Sesión no válida.');
     var data = getAllRaw(CONFIG.SHEETS.USUARIOS);
     if (data.length <= 1) return ok([]);
-    var usuarios = data.slice(1).map(function(row) {
-      return {
-        email:     row[COLS.USUARIOS.EMAIL],
-        nombre:    row[COLS.USUARIOS.NOMBRE],
-        rol:       row[COLS.USUARIOS.ROL],
-        activo:    row[COLS.USUARIOS.ACTIVO],
-        fechaAlta: toISO(row[COLS.USUARIOS.FECHA_ALTA])
-      };
-    });
+    var usuarios = data.slice(1)
+      .filter(function(row) { return !!row[COLS.USUARIOS.EMAIL]; })
+      .map(function(row) {
+        return {
+          email:     row[COLS.USUARIOS.EMAIL],
+          nombre:    row[COLS.USUARIOS.NOMBRE],
+          rol:       row[COLS.USUARIOS.ROL],
+          activo:    row[COLS.USUARIOS.ACTIVO],
+          fechaAlta: toISO(row[COLS.USUARIOS.FECHA_ALTA])
+          // Password nunca se devuelve al cliente
+        };
+      });
     return ok(usuarios);
   } catch (e) {
     logErr('getUsuarios', e);
@@ -81,14 +80,16 @@ function getUsuarios() {
   }
 }
 
-function addUsuario(email, nombre, rol) {
+function addUsuario(token, email, nombre, rol, password) {
   try {
-    requireEditPermission();
+    requireAdminPermission(token);
     if (!email || !nombre || !rol) throw new Error('Email, nombre y rol son obligatorios.');
+    if (!password || password.trim().length < 4) throw new Error('La contraseña debe tener al menos 4 caracteres.');
+    email = email.trim().toLowerCase();
     if (findRow(CONFIG.SHEETS.USUARIOS, COLS.USUARIOS.EMAIL, email)) {
       throw new Error('Ya existe un usuario con ese email.');
     }
-    appendRow(CONFIG.SHEETS.USUARIOS, [email, nombre, rol, true, new Date()]);
+    appendRow(CONFIG.SHEETS.USUARIOS, [email, nombre, rol, true, password.trim(), new Date()]);
     return ok(null, 'Usuario añadido correctamente.');
   } catch (e) {
     logErr('addUsuario', e);
@@ -96,9 +97,10 @@ function addUsuario(email, nombre, rol) {
   }
 }
 
-function updateUsuarioRol(email, nuevoRol) {
+function updateUsuarioRol(token, email, nuevoRol) {
   try {
-    if (!isAdmin(getCurrentUser())) throw new Error('Solo los administradores pueden cambiar roles.');
+    requireAdminPermission(token);
+    email = (email || '').trim().toLowerCase();
     var result = findRow(CONFIG.SHEETS.USUARIOS, COLS.USUARIOS.EMAIL, email);
     if (!result) throw new Error('Usuario no encontrado.');
     setCellValue(CONFIG.SHEETS.USUARIOS, result.rowIndex, COLS.USUARIOS.ROL, nuevoRol);
@@ -109,9 +111,10 @@ function updateUsuarioRol(email, nuevoRol) {
   }
 }
 
-function toggleUsuarioActivo(email) {
+function toggleUsuarioActivo(token, email) {
   try {
-    if (!isAdmin(getCurrentUser())) throw new Error('Solo los administradores pueden desactivar usuarios.');
+    requireAdminPermission(token);
+    email = (email || '').trim().toLowerCase();
     var result = findRow(CONFIG.SHEETS.USUARIOS, COLS.USUARIOS.EMAIL, email);
     if (!result) throw new Error('Usuario no encontrado.');
     var current = result.row[COLS.USUARIOS.ACTIVO];
