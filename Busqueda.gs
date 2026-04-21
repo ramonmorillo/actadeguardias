@@ -120,6 +120,61 @@ function matchesFiltros(row, f, partesMap) {
   return true;
 }
 
+/**
+ * Exporta los resultados de búsqueda como CSV (sin paginación — hasta 5000 filas).
+ * Acepta los mismos filtros que searchIncidencias.
+ */
+function exportBusquedaCSV(filtros) {
+  try {
+    filtros = filtros || {};
+    filtros.page     = 1;
+    filtros.pageSize = 5000;
+
+    var r = searchIncidencias(filtros);
+    if (!r.success) return r;
+
+    var esc = function(v) {
+      if (v === null || v === undefined) return '';
+      var s = v.toString().replace(/"/g, '""');
+      return (s.indexOf(',') !== -1 || s.indexOf('"') !== -1 || s.indexOf('\n') !== -1)
+        ? '"' + s + '"' : s;
+    };
+
+    var headers = [
+      'ID', 'IDParte', 'FechaEvento', 'Area', 'TipoEntrada',
+      'Descripcion', 'Actuacion', 'Medicamentos', 'Servicio_Ubicacion',
+      'Prioridad', 'Estado', 'Etiquetas', 'RegistradoPor',
+      'FechaRegistro', 'Seguimiento'
+    ];
+
+    var lines = [headers.map(esc).join(',')];
+    r.data.resultados.forEach(function(inc) {
+      lines.push([
+        inc.id,
+        inc.idParte,
+        inc.fechaEvento  ? formatDateTime(new Date(inc.fechaEvento))   : '',
+        inc.area          || '',
+        inc.tipoEntrada   || '',
+        inc.descripcion   || '',
+        inc.actuacion     || '',
+        inc.medicamentos  || '',
+        inc.servicio      || '',
+        inc.prioridad     || '',
+        inc.estado        || '',
+        inc.etiquetas     || '',
+        inc.registradoPor || '',
+        inc.fechaRegistro ? formatDateTime(new Date(inc.fechaRegistro)) : '',
+        inc.seguimiento   || ''
+      ].map(esc).join(','));
+    });
+
+    return ok({ csv: '﻿' + lines.join('\r\n'), total: r.data.total });
+  } catch (e) {
+    logErr('exportBusquedaCSV', e);
+    return fail(e.message);
+  }
+}
+
 /** Devuelve lista de IDs de partes para poblar el selector del buscador. */
 function getPartesParaSelector() {
   try {

@@ -607,8 +607,11 @@
 
     <!-- Resultados -->
     <div id="bq-resultados" style="display:none;">
-      <div class="d-flex align-items-center mb-2">
+      <div class="d-flex align-items-center mb-2 gap-2 flex-wrap">
         <span class="text-muted small" id="bq-total-label"></span>
+        <button class="btn btn-outline-success btn-sm ms-auto" onclick="exportarBusquedaCSV()">
+          <i class="bi bi-file-earmark-spreadsheet me-1"></i>Exportar CSV
+        </button>
       </div>
       <div class="table-card">
         <div class="table-responsive">
@@ -1525,15 +1528,13 @@ function poblarSelectoresCatalogos() {
   llenarSelect('inc-filtro-area', areas);
 }
 
-function abrirModalPassword() {
+function abrirModalPassword(prefilledEmail) {
   document.getElementById('pwd-nueva').value   = '';
   document.getElementById('pwd-repite').value  = '';
   var isAdmin = APP.user && APP.user.rol === 'admin';
   var adminRow = document.getElementById('pwd-admin-row');
   adminRow.style.display = isAdmin ? '' : 'none';
-  if (isAdmin) {
-    document.getElementById('pwd-target-email').value = '';
-  }
+  document.getElementById('pwd-target-email').value = (isAdmin && prefilledEmail) ? prefilledEmail : '';
   APP.modalPasswordInst.show();
 }
 
@@ -1679,8 +1680,12 @@ function filtrarHistorico() {
 
   tbody.innerHTML = filtrados.map(function(p) {
     var canEdit = (APP.user && (APP.user.rol === 'admin' || APP.user.rol === 'editor'));
+    var isAdmin = APP.user && APP.user.rol === 'admin';
     var btnsCerrar = (p.estado === 'borrador' && canEdit)
       ? '<button class="btn btn-outline-dark btn-sm py-0 me-1" onclick="confirmarCerrarParte(\'' + p.id + '\')" title="Cerrar"><i class="bi bi-lock"></i></button>'
+      : '';
+    var btnsReabrir = (p.estado === 'cerrado' && isAdmin)
+      ? '<button class="btn btn-outline-warning btn-sm py-0 me-1" onclick="confirmarReabrirHistorico(\'' + p.id + '\')" title="Reabrir"><i class="bi bi-lock-fill"></i></button>'
       : '';
     return '<tr>' +
       '<td><a href="#" onclick="abrirParte(\'' + p.id + '\')" class="text-primary fw-semibold text-decoration-none small">' + p.id + '</a></td>' +
@@ -1695,8 +1700,9 @@ function filtrarHistorico() {
         '<button class="btn btn-outline-primary btn-sm py-0 me-1" onclick="abrirParte(\'' + p.id + '\')" title="Ver"><i class="bi bi-eye"></i></button>' +
         (canEdit ? '<button class="btn btn-outline-secondary btn-sm py-0 me-1" onclick="abrirModalParte(\'' + p.id + '\')" title="Editar"><i class="bi bi-pencil"></i></button>' : '') +
         btnsCerrar +
+        btnsReabrir +
         (canEdit ? '<button class="btn btn-outline-secondary btn-sm py-0 me-1" onclick="confirmarDuplicar(\'' + p.id + '\')" title="Duplicar"><i class="bi bi-copy"></i></button>' : '') +
-        (APP.user && APP.user.rol === 'admin' ? '<button class="btn btn-outline-danger btn-sm py-0" onclick="confirmarEliminarParte(\'' + p.id + '\')" title="Eliminar parte"><i class="bi bi-trash3"></i></button>' : '') +
+        (isAdmin ? '<button class="btn btn-outline-danger btn-sm py-0" onclick="confirmarEliminarParte(\'' + p.id + '\')" title="Eliminar parte"><i class="bi bi-trash3"></i></button>' : '') +
       '</td>' +
     '</tr>';
   }).join('');
@@ -1883,6 +1889,17 @@ function confirmarDuplicar(id) {
     llamarW('duplicateParte', [id], 'Duplicando…', function(data) {
       toast('Parte duplicado: ' + data.id, 'success');
       abrirParte(data.id);
+    });
+  });
+}
+
+function confirmarReabrirHistorico(id) {
+  confirmar('Reabrir parte', '¿Reabrir el parte ' + id + '? Quedará en estado Borrador.', function() {
+    llamarW('reopenParte', [id], 'Reabriendo…', function() {
+      toast('Parte ' + id + ' reabierto.', 'success');
+      var p = APP.histAllPartes.find(function(x){ return x.id === id; });
+      if (p) p.estado = 'borrador';
+      filtrarHistorico();
     });
   });
 }
@@ -2255,6 +2272,38 @@ function buscar(page) {
 //  INFORMES
 // ══════════════════════════════════════════════════════
 
+function exportarBusquedaCSV() {
+  var filtros = {
+    texto:              document.getElementById('bq-texto').value.trim()       || undefined,
+    fechaDesde:         document.getElementById('bq-desde').value              || undefined,
+    fechaHasta:         document.getElementById('bq-hasta').value              || undefined,
+    idParte:            document.getElementById('bq-parte').value              || undefined,
+    area:               document.getElementById('bq-area').value               || undefined,
+    tipoEntrada:        document.getElementById('bq-tipo').value               || undefined,
+    medicamento:        document.getElementById('bq-medicamento').value.trim() || undefined,
+    servicio:           document.getElementById('bq-servicio').value.trim()    || undefined,
+    prioridad:          document.getElementById('bq-prioridad').value          || undefined,
+    estado:             document.getElementById('bq-estado').value             || undefined,
+    registradoPor:      document.getElementById('bq-registrado').value.trim()  || undefined,
+    profesionalGuardia: document.getElementById('bq-profesional').value.trim() || undefined,
+    conAdjuntos:        document.getElementById('bq-adjuntos').value === 'si' ? true : undefined
+  };
+  Object.keys(filtros).forEach(function(k){ if (filtros[k] === undefined) delete filtros[k]; });
+
+  llamar('exportBusquedaCSV', [filtros], 'Preparando CSV…', function(res) {
+    var blob  = new Blob([res.csv], { type: 'text/csv;charset=utf-8;' });
+    var url   = URL.createObjectURL(blob);
+    var a     = document.createElement('a');
+    var desde = document.getElementById('bq-desde').value || 'todo';
+    var hasta = document.getElementById('bq-hasta').value || 'todo';
+    a.href    = url;
+    a.download = 'busqueda_' + desde + '_' + hasta + '.csv';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast(res.total + ' incidencias exportadas.', 'success');
+  });
+}
+
 function initInformes() {
   // Poner fechas por defecto (último mes)
   if (!document.getElementById('inf-desde').value) {
@@ -2519,6 +2568,9 @@ function cargarUsuarios() {
               return '<option value="' + r + '"' + (u.rol === r ? ' selected' : '') + '>' + r + '</option>';
             }).join('') +
           '</select>' +
+          '<button class="btn btn-outline-secondary btn-sm py-0 me-1" ' +
+            'onclick="abrirModalPassword(\'' + escHtml(u.email) + '\')" title="Cambiar contraseña">' +
+            '<i class="bi bi-key"></i></button>' +
           (!esYo
             ? '<button class="btn btn-sm ' + (u.activo ? 'btn-outline-warning' : 'btn-outline-success') + ' py-0" ' +
               'onclick="toggleUsuarioActivo(\'' + escHtml(u.email) + '\')" title="' + (u.activo ? 'Desactivar' : 'Activar') + '">' +
