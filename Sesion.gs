@@ -32,17 +32,22 @@ function loginUsuario(email, password) {
     if (!email || !password) return fail('Email y contraseña son obligatorios.');
 
     email = email.toString().trim().toLowerCase();
-    var result = findRow(CONFIG.SHEETS.USUARIOS, COLS.USUARIOS.EMAIL, email);
+    var schemaUsers = getUsuariosSchema();
+    var usersData = getAllRaw(CONFIG.SHEETS.USUARIOS);
+    var row = null;
+    for (var i = 1; i < usersData.length; i++) {
+      if (normalizeIdKey(rowVal(usersData[i], schemaUsers.EMAIL)).toLowerCase() === email) {
+        row = usersData[i];
+        break;
+      }
+    }
+    if (!row) return fail('Usuario no encontrado. Contacta con el administrador.');
 
-    if (!result) return fail('Usuario no encontrado. Contacta con el administrador.');
-
-    var row = result.row;
-
-    if (!row[COLS.USUARIOS.ACTIVO]) {
+    if (!rowVal(row, schemaUsers.ACTIVO)) {
       return fail('Tu cuenta está desactivada. Contacta con el administrador.');
     }
 
-    var storedPwd = (row[COLS.USUARIOS.PASSWORD] || '').toString().trim();
+    var storedPwd = (rowVal(row, schemaUsers.PASSWORD) || '').toString().trim();
     if (storedPwd === '') {
       return fail('Esta cuenta no tiene contraseña configurada. Contacta con el administrador.');
     }
@@ -53,9 +58,9 @@ function loginUsuario(email, password) {
     }
 
     var userInfo = {
-      email:  row[COLS.USUARIOS.EMAIL],
-      nombre: row[COLS.USUARIOS.NOMBRE],
-      rol:    row[COLS.USUARIOS.ROL]
+      email:  normalizeIdKey(rowVal(row, schemaUsers.EMAIL)).toLowerCase(),
+      nombre: rowVal(row, schemaUsers.NOMBRE),
+      rol:    rowVal(row, schemaUsers.ROL)
     };
 
     var token = _crearSesion(userInfo);
@@ -136,13 +141,14 @@ function cambiarPassword(token, targetEmail, newPassword) {
       return fail('Solo los administradores pueden cambiar la contraseña de otro usuario.');
     }
 
-    var result = findRow(CONFIG.SHEETS.USUARIOS, COLS.USUARIOS.EMAIL, targetEmail);
+    var schemaUsers = getUsuariosSchema();
+    var result = findRow(CONFIG.SHEETS.USUARIOS, schemaUsers.EMAIL, targetEmail);
     if (!result) return fail('Usuario no encontrado.');
 
     setCellValue(
       CONFIG.SHEETS.USUARIOS,
       result.rowIndex,
-      COLS.USUARIOS.PASSWORD,
+      schemaUsers.PASSWORD,
       newPassword.toString().trim()
     );
 

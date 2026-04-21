@@ -1735,6 +1735,9 @@ function cargarDashboard() {
 
   llamar('listPartesConConteo', [8], 'Cargando panel…', function(partes) {
     renderDashPartes(partes);
+  }, function(err) {
+    renderDashPartes([]);
+    console.warn('Dashboard partes:', err);
   });
   llamar('getEstadisticas', [kpiParams], null, function(est) {
     document.getElementById('kpi-partes').textContent    = est.totalPartes;
@@ -1742,17 +1745,27 @@ function cargarDashboard() {
     document.getElementById('kpi-criticas').textContent  = est.criticas;
     document.getElementById('kpi-resueltas').textContent = est.resueltas;
     renderDashIncidencias();
+  }, function(err) {
+    ['kpi-partes','kpi-abiertas','kpi-criticas','kpi-resueltas'].forEach(function(id) {
+      document.getElementById(id).textContent = '—';
+    });
+    renderDashIncidencias();
+    console.warn('Dashboard estadísticas:', err);
   });
   // Pendientes de seguimiento
   llamar('searchIncidencias', [{ conSeguimiento: true, pageSize: 6, page: 1 }], null,
-    function(res) { renderDashSeguimiento(res.resultados || []); }
+    function(res) { renderDashSeguimiento(res.resultados || []); },
+    function(err) {
+      renderDashSeguimiento([]);
+      console.warn('Dashboard seguimiento:', err);
+    }
   );
 }
 
 function renderDashPartes(partes) {
   var tbody = document.getElementById('dash-partes-body');
   if (!partes || partes.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No hay partes registrados aún.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No hay partes registrados aún.</td></tr>';
     return;
   }
   tbody.innerHTML = partes.map(function(p) {

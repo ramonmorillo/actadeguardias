@@ -13,6 +13,8 @@
  */
 function generateInforme(params) {
   try {
+    var schemaPartes = getPartesSchema();
+    var schemaInc = getIncidenciasSchema();
     params = params || {};
     var desde = params.fechaDesde ? new Date(params.fechaDesde) : null;
     var hasta  = params.fechaHasta ? new Date(params.fechaHasta) : null;
@@ -26,8 +28,8 @@ function generateInforme(params) {
 
     for (var i = 1; i < partesRaw.length; i++) {
       var pr = partesRaw[i];
-      if (!pr[COLS.PARTES.ID]) continue;
-      var fi = new Date(pr[COLS.PARTES.FECHA_INICIO]);
+      if (!rowVal(pr, schemaPartes.ID)) continue;
+      var fi = new Date(rowVal(pr, schemaPartes.FECHA_INICIO));
       if (desde && fi < desde) continue;
       if (hasta && fi > hasta) continue;
       var parteObj = rowToParte(pr);
@@ -57,32 +59,32 @@ function generateInforme(params) {
 
     for (var j = 1; j < incRaw.length; j++) {
       var ir = incRaw[j];
-      if (!ir[COLS.INCIDENCIAS.ID]) continue;
+      if (!rowVal(ir, schemaInc.ID)) continue;
 
       // Solo incidencias cuyo parte esté en el rango seleccionado
-      var idParte = ir[COLS.INCIDENCIAS.ID_PARTE];
+      var idParte = normalizeIdKey(rowVal(ir, schemaInc.ID_PARTE));
       if (!parteIdSet[idParte]) continue;
 
       // Filtros opcionales sobre incidencias
-      if (params.area         && ir[COLS.INCIDENCIAS.AREA]           !== params.area)         continue;
-      if (params.tipoEntrada  && ir[COLS.INCIDENCIAS.TIPO_ENTRADA]   !== params.tipoEntrada)  continue;
-      if (params.prioridad    && ir[COLS.INCIDENCIAS.PRIORIDAD]      !== params.prioridad)    continue;
-      if (params.registradoPor && ir[COLS.INCIDENCIAS.REGISTRADO_POR] !== params.registradoPor) continue;
+      if (params.area         && rowVal(ir, schemaInc.AREA)           !== params.area)         continue;
+      if (params.tipoEntrada  && rowVal(ir, schemaInc.TIPO_ENTRADA)   !== params.tipoEntrada)  continue;
+      if (params.prioridad    && rowVal(ir, schemaInc.PRIORIDAD)      !== params.prioridad)    continue;
+      if (params.registradoPor && rowVal(ir, schemaInc.REGISTRADO_POR) !== params.registradoPor) continue;
       if (params.medicamento) {
-        var m = (ir[COLS.INCIDENCIAS.MEDICAMENTOS] || '').toLowerCase();
+        var m = (rowVal(ir, schemaInc.MEDICAMENTOS) || '').toLowerCase();
         if (m.indexOf(params.medicamento.toLowerCase()) === -1) continue;
       }
 
-      var inc = rowToIncidencia(ir);
+      var inc = rowToIncidencia(ir, schemaInc);
       if (!incByParte[idParte]) incByParte[idParte] = [];
       incByParte[idParte].push(inc);
       totalIncidencias++;
 
       // Agregados para el resumen
-      var a = ir[COLS.INCIDENCIAS.AREA]         || 'Sin área';
-      var t = ir[COLS.INCIDENCIAS.TIPO_ENTRADA] || 'Sin tipo';
-      var p = ir[COLS.INCIDENCIAS.PRIORIDAD]    || 'Sin prioridad';
-      var e = ir[COLS.INCIDENCIAS.ESTADO]       || 'Sin estado';
+      var a = rowVal(ir, schemaInc.AREA)         || 'Sin área';
+      var t = rowVal(ir, schemaInc.TIPO_ENTRADA) || 'Sin tipo';
+      var p = rowVal(ir, schemaInc.PRIORIDAD)    || 'Sin prioridad';
+      var e = rowVal(ir, schemaInc.ESTADO)       || 'Sin estado';
       porArea[a]      = (porArea[a]      || 0) + 1;
       porTipo[t]      = (porTipo[t]      || 0) + 1;
       porPrioridad[p] = (porPrioridad[p] || 0) + 1;
