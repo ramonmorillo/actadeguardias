@@ -28,6 +28,17 @@ function rowToIncidencia(row) {
   };
 }
 
+function validateAreaIncidencia(area) {
+  requireField(area, 'Área');
+  var c = getCatalogos();
+  if (c && c.success && c.data && c.data.Area && c.data.Area.length) {
+    if (c.data.Area.indexOf(area) === -1) {
+      throw new Error('Área no válida: ' + area);
+    }
+  }
+  return area;
+}
+
 // ── Crear ──────────────────────────────────────────────────────────────────
 
 function createIncidencia(token, data) {
@@ -37,6 +48,7 @@ function createIncidencia(token, data) {
     requireField(data.descripcion, 'Descripción');
     requireField(data.area,        'Área');
     requireField(data.tipoEntrada, 'Tipo de entrada');
+    var areaValidada = validateAreaIncidencia(data.area);
 
     var warnings = checkSensitiveData([
       { name: 'Descripción', value: data.descripcion },
@@ -51,7 +63,7 @@ function createIncidencia(token, data) {
       id,
       data.idParte,
       data.fechaEvento ? new Date(data.fechaEvento) : now,
-      data.area,
+      areaValidada,
       data.tipoEntrada,
       data.descripcion,
       data.actuacion    || '',
@@ -128,7 +140,13 @@ function updateIncidencia(token, id, data) {
 
     Object.keys(campos).forEach(function(key) {
       if (data[key] !== undefined) {
-        row[campos[key]] = (key === 'fechaEvento') ? new Date(data[key]) : data[key];
+        if (key === 'fechaEvento') {
+          row[campos[key]] = new Date(data[key]);
+        } else if (key === 'area') {
+          row[campos[key]] = validateAreaIncidencia(data[key]);
+        } else {
+          row[campos[key]] = data[key];
+        }
       }
     });
 

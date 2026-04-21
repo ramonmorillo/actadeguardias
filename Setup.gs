@@ -6,7 +6,7 @@
 var HEADERS = {
   CONFIG:      ['Clave', 'Valor', 'Descripcion'],
   USUARIOS:    ['Email', 'Nombre', 'Rol', 'Activo', 'Password', 'FechaAlta'],
-  PARTES:      ['ID', 'FechaInicio', 'FechaFin', 'TipoPeriodo', 'Profesionales',
+  PARTES:      ['ID', 'FechaInicio', 'FechaFin', 'TipoPeriodo', 'Profesionales', 'AreasImplicadas',
                 'CreadoPor', 'FechaCreacion', 'UltimaModificacion', 'ModificadoPor',
                 'Estado', 'Observaciones'],
   INCIDENCIAS: ['ID', 'IDParte', 'FechaEvento', 'Area', 'TipoEntrada',
@@ -135,11 +135,11 @@ function addSamplePartes(ss) {
   var id1 = 'PG-' + Utilities.formatDate(sabPasado,  'Europe/Madrid', 'yyyyMMdd') + '-0001';
   var id2 = 'PG-' + Utilities.formatDate(sabAnterior,'Europe/Madrid', 'yyyyMMdd') + '-0001';
 
-  partesSheet.getRange(2, 1, 2, 11).setValues([
-    [id1, sabPasado,  lunPasado,  'Fin de semana', 'Ana García López, Carlos Martínez Ruiz',
+  partesSheet.getRange(2, 1, 2, 12).setValues([
+    [id1, sabPasado,  lunPasado,  'Fin de semana', 'Ana García López, Carlos Martínez Ruiz', '["UCI","Gestión"]',
      'farmaceutico1@farmacia.es', new Date(), new Date(), 'farmaceutico1@farmacia.es',
      'cerrado', 'Guardia sin incidencias graves. Flujo habitual del fin de semana.'],
-    [id2, sabAnterior,lunAnterior,'Fin de semana', 'María Fernández Díaz',
+    [id2, sabAnterior,lunAnterior,'Fin de semana', 'María Fernández Díaz', '["Unidosis"]',
      'tecnico1@farmacia.es',     new Date(), new Date(), 'tecnico1@farmacia.es',
      'cerrado', 'Guardia tranquila. Se atienden consultas habituales de unidades.']
   ]);
