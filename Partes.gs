@@ -5,25 +5,75 @@
 
 // ── Mapper fila → objeto ───────────────────────────────────────────────────
 
-function rowToParte(row) {
-  var profesionalesList = parseListValue(row[COLS.PARTES.PROFESIONALES]);
-  var areasList = parseListValue(row[COLS.PARTES.AREAS_IMPLICADAS]);
-  var normalizadas = normalizarSeparacionProfesionalesYAreas(profesionalesList, areasList);
+function getPartesSchema() {
+  var raw = getAllRaw(CONFIG.SHEETS.PARTES);
+  var headers = (raw && raw.length) ? raw[0] : [];
+  var map = {};
+  headers.forEach(function(h, i) {
+    var key = (h || '').toString().toLowerCase().replace(/\s+/g, '');
+    map[key] = i;
+  });
+
+  var findIdx = function(posibles, fallback) {
+    for (var i = 0; i < posibles.length; i++) {
+      if (map[posibles[i]] !== undefined) return map[posibles[i]];
+    }
+    return fallback;
+  };
+
   return {
-    id:                  row[COLS.PARTES.ID],
-    fechaInicio:         toISO(row[COLS.PARTES.FECHA_INICIO]),
-    fechaFin:            toISO(row[COLS.PARTES.FECHA_FIN]),
-    tipoPeriodo:         row[COLS.PARTES.TIPO_PERIODO],
+    ID: findIdx(['id'], COLS.PARTES.ID),
+    FECHA_INICIO: findIdx(['fechainicio'], COLS.PARTES.FECHA_INICIO),
+    FECHA_FIN: findIdx(['fechafin'], COLS.PARTES.FECHA_FIN),
+    TIPO_PERIODO: findIdx(['tipoperiodo'], COLS.PARTES.TIPO_PERIODO),
+    PROFESIONALES: findIdx(['profesionales'], COLS.PARTES.PROFESIONALES),
+    AREAS_IMPLICADAS: findIdx(['areasimplicadas'], COLS.PARTES.AREAS_IMPLICADAS),
+    CREADO_POR: findIdx(['creadopor'], COLS.PARTES.CREADO_POR),
+    FECHA_CREACION: findIdx(['fechacreacion'], COLS.PARTES.FECHA_CREACION),
+    ULTIMA_MODIFICACION: findIdx(['ultimamodificacion'], COLS.PARTES.ULTIMA_MODIFICACION),
+    MODIFICADO_POR: findIdx(['modificadopor'], COLS.PARTES.MODIFICADO_POR),
+    ESTADO: findIdx(['estado'], COLS.PARTES.ESTADO),
+    OBSERVACIONES: findIdx(['observaciones'], COLS.PARTES.OBSERVACIONES)
+  };
+}
+
+function ensureAreasImplicadasColumn() {
+  var schema = getPartesSchema();
+  if (schema.AREAS_IMPLICADAS >= 0) return schema;
+
+  var sheet = getSheet(CONFIG.SHEETS.PARTES);
+  var insertAfter = schema.PROFESIONALES >= 0 ? schema.PROFESIONALES + 1 : 5;
+  sheet.insertColumnAfter(insertAfter);
+  sheet.getRange(1, insertAfter + 1).setValue('AreasImplicadas');
+  return getPartesSchema();
+}
+
+function rowVal(row, idx) {
+  return (idx >= 0 && idx < row.length) ? row[idx] : '';
+}
+
+function rowToParte(row, opts) {
+  opts = opts || {};
+  var schema = opts.schema || getPartesSchema();
+  var areasCatalogo = opts.areasCatalogo || CONFIG.AREAS;
+  var profesionalesList = parseListValue(rowVal(row, schema.PROFESIONALES));
+  var areasList = parseListValue(rowVal(row, schema.AREAS_IMPLICADAS));
+  var normalizadas = normalizarSeparacionProfesionalesYAreas(profesionalesList, areasList, areasCatalogo);
+  return {
+    id:                  normalizeIdKey(rowVal(row, schema.ID)),
+    fechaInicio:         toISO(rowVal(row, schema.FECHA_INICIO)),
+    fechaFin:            toISO(rowVal(row, schema.FECHA_FIN)),
+    tipoPeriodo:         rowVal(row, schema.TIPO_PERIODO),
     profesionales:       normalizadas.profesionales.join(', '),
     profesionalesLista:  normalizadas.profesionales,
     areasImplicadas:     normalizadas.areas.join(', '),
     areasImplicadasLista: normalizadas.areas,
-    creadoPor:           row[COLS.PARTES.CREADO_POR],
-    fechaCreacion:       toISO(row[COLS.PARTES.FECHA_CREACION]),
-    ultimaModificacion:  toISO(row[COLS.PARTES.ULTIMA_MODIFICACION]),
-    modificadoPor:       row[COLS.PARTES.MODIFICADO_POR],
-    estado:              row[COLS.PARTES.ESTADO],
-    observaciones:       row[COLS.PARTES.OBSERVACIONES]
+    creadoPor:           rowVal(row, schema.CREADO_POR),
+    fechaCreacion:       toISO(rowVal(row, schema.FECHA_CREACION)),
+    ultimaModificacion:  toISO(rowVal(row, schema.ULTIMA_MODIFICACION)),
+    modificadoPor:       rowVal(row, schema.MODIFICADO_POR),
+    estado:              rowVal(row, schema.ESTADO),
+    observaciones:       rowVal(row, schema.OBSERVACIONES)
   };
 }
 
@@ -31,11 +81,14 @@ function rowToParte(row) {
  * Corrige histórico donde el campo Profesionales incluía áreas.
  * Si un valor coincide con el catálogo de áreas, se mueve a areas.
  */
-function normalizarSeparacionProfesionalesYAreas(profesionalesList, areasList) {
+function normalizarSeparacionProfesionalesYAreas(profesionalesList, areasList, areasCatalogoArg) {
   var profesionales = uniqueCaseInsensitive(parseListValue(profesionalesList));
   var areas = uniqueCaseInsensitive(parseListValue(areasList));
-  var c = getCatalogos();
-  var areasCatalogo = (c && c.success && c.data && c.data.Area) ? c.data.Area : CONFIG.AREAS;
+  var areasCatalogo = areasCatalogoArg || CONFIG.AREAS;
+  if (!areasCatalogoArg) {
+    var c = getCatalogos();
+    areasCatalogo = (c && c.success && c.data && c.data.Area) ? c.data.Area : CONFIG.AREAS;
+  }
 
   var profesionalesFiltrados = [];
   profesionales.forEach(function(v) {
@@ -52,11 +105,14 @@ function normalizarSeparacionProfesionalesYAreas(profesionalesList, areasList) {
   };
 }
 
-function normalizarAreasParte(input) {
+function normalizarAreasParte(input, areasCatalogoArg) {
   var areas = uniqueCaseInsensitive(parseListValue(input));
-  var c = getCatalogos();
-  if (c && c.success && c.data && c.data.Area && c.data.Area.length) {
-    var catalogo = c.data.Area;
+  var catalogo = areasCatalogoArg;
+  if (!catalogo) {
+    var c = getCatalogos();
+    catalogo = (c && c.success && c.data && c.data.Area && c.data.Area.length) ? c.data.Area : null;
+  }
+  if (catalogo && catalogo.length) {
     areas.forEach(function(nombre) {
       if (catalogo.indexOf(nombre) === -1) {
         throw new Error('Área implicada no válida: ' + nombre);
@@ -78,11 +134,16 @@ function validateFromCatalogOrFallback(tipoCatalogo, valor, fallback) {
   return valor;
 }
 
-function normalizarProfesionalesParte(input) {
+function normalizarProfesionalesParte(input, profesionalesCatalogoArg) {
   var profesionales = uniqueCaseInsensitive(parseListValue(input));
-  var c = getCatalogos();
-  if (c && c.success && c.data && c.data.ProfesionalGuardia && c.data.ProfesionalGuardia.length) {
-    var catalogo = c.data.ProfesionalGuardia;
+  var catalogo = profesionalesCatalogoArg;
+  if (!catalogo) {
+    var c = getCatalogos();
+    catalogo = (c && c.success && c.data && c.data.ProfesionalGuardia && c.data.ProfesionalGuardia.length)
+      ? c.data.ProfesionalGuardia
+      : null;
+  }
+  if (catalogo && catalogo.length) {
     profesionales.forEach(function(nombre) {
       if (catalogo.indexOf(nombre) === -1) {
         throw new Error('Profesional de guardia no válido: ' + nombre);
@@ -105,27 +166,34 @@ function createParte(token, data) {
       throw new Error('La fecha de fin debe ser posterior a la de inicio.');
     }
 
+    var schema = ensureAreasImplicadasColumn();
+    var c = getCatalogos();
+    var areasCatalogo = (c && c.success && c.data && c.data.Area) ? c.data.Area : CONFIG.AREAS;
+    var profesionalesCatalogo = (c && c.success && c.data && c.data.ProfesionalGuardia) ? c.data.ProfesionalGuardia : [];
     var tipoPeriodo = validateFromCatalogOrFallback('TipoPeriodo', data.tipoPeriodo);
     var estado = validateFromCatalogOrFallback('EstadoParte', data.estado || CONFIG.ESTADOS_PARTE.BORRADOR, CONFIG.ESTADOS_PARTE.BORRADOR);
     var profesionalesLista = parseListValue(data.profesionales || data.profesionalesLista || []);
     var areasImplicadasLista = parseListValue(data.areasImplicadas || data.areasImplicadasLista || []);
-    var normalizadas = normalizarSeparacionProfesionalesYAreas(profesionalesLista, areasImplicadasLista);
-    var profesionales = normalizarProfesionalesParte(normalizadas.profesionales);
-    var areasImplicadas = normalizarAreasParte(normalizadas.areas);
+    var normalizadas = normalizarSeparacionProfesionalesYAreas(profesionalesLista, areasImplicadasLista, areasCatalogo);
+    var profesionales = normalizarProfesionalesParte(normalizadas.profesionales, profesionalesCatalogo);
+    var areasImplicadas = normalizarAreasParte(normalizadas.areas, areasCatalogo);
 
     var id  = generateId('PG');
     var now = new Date();
-    appendRow(CONFIG.SHEETS.PARTES, [
-      id,
-      new Date(data.fechaInicio),
-      new Date(data.fechaFin),
-      tipoPeriodo,
-      profesionales,
-      areasImplicadas,
-      user.email, now, now, user.email,
-      estado,
-      data.observaciones || ''
-    ]);
+    var row = [];
+    row[schema.ID] = id;
+    row[schema.FECHA_INICIO] = new Date(data.fechaInicio);
+    row[schema.FECHA_FIN] = new Date(data.fechaFin);
+    row[schema.TIPO_PERIODO] = tipoPeriodo;
+    row[schema.PROFESIONALES] = profesionales;
+    row[schema.AREAS_IMPLICADAS] = areasImplicadas;
+    row[schema.CREADO_POR] = user.email;
+    row[schema.FECHA_CREACION] = now;
+    row[schema.ULTIMA_MODIFICACION] = now;
+    row[schema.MODIFICADO_POR] = user.email;
+    row[schema.ESTADO] = estado;
+    row[schema.OBSERVACIONES] = data.observaciones || '';
+    appendRow(CONFIG.SHEETS.PARTES, row);
     return ok({ id: id }, 'Parte creado correctamente.');
   } catch (e) {
     logErr('createParte', e);
@@ -137,9 +205,12 @@ function createParte(token, data) {
 
 function getParte(id) {
   try {
-    var result = findRow(CONFIG.SHEETS.PARTES, COLS.PARTES.ID, id);
+    var schema = getPartesSchema();
+    var result = findRow(CONFIG.SHEETS.PARTES, schema.ID, normalizeIdKey(id));
     if (!result) return fail('Parte no encontrado: ' + id);
-    return ok(rowToParte(result.row));
+    var c = getCatalogos();
+    var areasCatalogo = (c && c.success && c.data && c.data.Area) ? c.data.Area : CONFIG.AREAS;
+    return ok(rowToParte(result.row, { schema: schema, areasCatalogo: areasCatalogo }));
   } catch (e) {
     logErr('getParte', e);
     return fail(e.message);
@@ -148,11 +219,14 @@ function getParte(id) {
 
 function listPartes(limit) {
   try {
+    var schema = getPartesSchema();
     var data = getAllRaw(CONFIG.SHEETS.PARTES);
     if (data.length <= 1) return ok([]);
+    var c = getCatalogos();
+    var areasCatalogo = (c && c.success && c.data && c.data.Area) ? c.data.Area : CONFIG.AREAS;
     var partes = data.slice(1)
-      .filter(function(r) { return !!r[COLS.PARTES.ID]; })
-      .map(rowToParte);
+      .filter(function(r) { return !!normalizeIdKey(rowVal(r, schema.ID)); })
+      .map(function(row) { return rowToParte(row, { schema: schema, areasCatalogo: areasCatalogo }); });
     partes.sort(function(a, b) {
       return new Date(b.fechaCreacion) - new Date(a.fechaCreacion);
     });
@@ -170,18 +244,42 @@ function listPartes(limit) {
  */
 function listPartesConConteo(limit) {
   try {
+    var schema = getPartesSchema();
     var partesRaw = getAllRaw(CONFIG.SHEETS.PARTES);
     if (partesRaw.length <= 1) return ok([]);
+    var c = getCatalogos();
+    var areasCatalogo = (c && c.success && c.data && c.data.Area) ? c.data.Area : CONFIG.AREAS;
 
     var partes = partesRaw.slice(1)
-      .filter(function(r) { return !!r[COLS.PARTES.ID]; })
-      .map(rowToParte);
+      .filter(function(r) { return !!normalizeIdKey(rowVal(r, schema.ID)); })
+      .map(function(row) {
+        try {
+          return rowToParte(row, { schema: schema, areasCatalogo: areasCatalogo });
+        } catch (eRow) {
+          return {
+            id: normalizeIdKey(rowVal(row, schema.ID)),
+            fechaInicio: toISO(rowVal(row, schema.FECHA_INICIO)),
+            fechaFin: toISO(rowVal(row, schema.FECHA_FIN)),
+            tipoPeriodo: rowVal(row, schema.TIPO_PERIODO),
+            profesionales: displayListValue(rowVal(row, schema.PROFESIONALES)),
+            profesionalesLista: parseListValue(rowVal(row, schema.PROFESIONALES)),
+            areasImplicadas: displayListValue(rowVal(row, schema.AREAS_IMPLICADAS)),
+            areasImplicadasLista: parseListValue(rowVal(row, schema.AREAS_IMPLICADAS)),
+            creadoPor: rowVal(row, schema.CREADO_POR),
+            fechaCreacion: toISO(rowVal(row, schema.FECHA_CREACION)),
+            ultimaModificacion: toISO(rowVal(row, schema.ULTIMA_MODIFICACION)),
+            modificadoPor: rowVal(row, schema.MODIFICADO_POR),
+            estado: rowVal(row, schema.ESTADO),
+            observaciones: rowVal(row, schema.OBSERVACIONES)
+          };
+        }
+      });
 
     // Contar incidencias por parte en una sola lectura
     var incRaw = getAllRaw(CONFIG.SHEETS.INCIDENCIAS);
     var conteo = {};
     for (var i = 1; i < incRaw.length; i++) {
-      var pid = incRaw[i][COLS.INCIDENCIAS.ID_PARTE];
+      var pid = normalizeIdKey(incRaw[i][COLS.INCIDENCIAS.ID_PARTE]);
       if (pid) conteo[pid] = (conteo[pid] || 0) + 1;
     }
 
@@ -217,39 +315,43 @@ function getParteConIncidencias(id) {
 function updateParte(token, id, data) {
   try {
     var user   = requireEditPermission(token);
-    var result = findRow(CONFIG.SHEETS.PARTES, COLS.PARTES.ID, id);
+    var schema = ensureAreasImplicadasColumn();
+    var result = findRow(CONFIG.SHEETS.PARTES, schema.ID, normalizeIdKey(id));
     if (!result) throw new Error('Parte no encontrado.');
+    var c = getCatalogos();
+    var areasCatalogo = (c && c.success && c.data && c.data.Area) ? c.data.Area : CONFIG.AREAS;
+    var profesionalesCatalogo = (c && c.success && c.data && c.data.ProfesionalGuardia) ? c.data.ProfesionalGuardia : [];
 
-    if (result.row[COLS.PARTES.ESTADO] === CONFIG.ESTADOS_PARTE.CERRADO &&
+    if (rowVal(result.row, schema.ESTADO) === CONFIG.ESTADOS_PARTE.CERRADO &&
         user.rol !== CONFIG.ROLES.ADMIN) {
       throw new Error('El parte está cerrado. Solo un administrador puede modificarlo.');
     }
 
     var row = result.row.slice();
-    if (data.fechaInicio  !== undefined) row[COLS.PARTES.FECHA_INICIO]  = new Date(data.fechaInicio);
-    if (data.fechaFin     !== undefined) row[COLS.PARTES.FECHA_FIN]     = new Date(data.fechaFin);
+    if (data.fechaInicio  !== undefined) row[schema.FECHA_INICIO]  = new Date(data.fechaInicio);
+    if (data.fechaFin     !== undefined) row[schema.FECHA_FIN]     = new Date(data.fechaFin);
     if (data.tipoPeriodo  !== undefined) {
-      row[COLS.PARTES.TIPO_PERIODO] = validateFromCatalogOrFallback('TipoPeriodo', data.tipoPeriodo);
+      row[schema.TIPO_PERIODO] = validateFromCatalogOrFallback('TipoPeriodo', data.tipoPeriodo);
     }
     if (data.profesionales!== undefined || data.profesionalesLista !== undefined ||
         data.areasImplicadas !== undefined || data.areasImplicadasLista !== undefined) {
       var profInput = data.profesionalesLista !== undefined
         ? data.profesionalesLista
-        : (data.profesionales !== undefined ? data.profesionales : row[COLS.PARTES.PROFESIONALES]);
+        : (data.profesionales !== undefined ? data.profesionales : row[schema.PROFESIONALES]);
       var areasInput = data.areasImplicadasLista !== undefined
         ? data.areasImplicadasLista
-        : (data.areasImplicadas !== undefined ? data.areasImplicadas : row[COLS.PARTES.AREAS_IMPLICADAS]);
-      var normalizadasUpdate = normalizarSeparacionProfesionalesYAreas(profInput, areasInput);
-      row[COLS.PARTES.PROFESIONALES] = normalizarProfesionalesParte(normalizadasUpdate.profesionales);
-      row[COLS.PARTES.AREAS_IMPLICADAS] = normalizarAreasParte(normalizadasUpdate.areas);
+        : (data.areasImplicadas !== undefined ? data.areasImplicadas : row[schema.AREAS_IMPLICADAS]);
+      var normalizadasUpdate = normalizarSeparacionProfesionalesYAreas(profInput, areasInput, areasCatalogo);
+      row[schema.PROFESIONALES] = normalizarProfesionalesParte(normalizadasUpdate.profesionales, profesionalesCatalogo);
+      row[schema.AREAS_IMPLICADAS] = normalizarAreasParte(normalizadasUpdate.areas, areasCatalogo);
     }
-    if (data.observaciones!== undefined) row[COLS.PARTES.OBSERVACIONES] = data.observaciones;
+    if (data.observaciones!== undefined) row[schema.OBSERVACIONES] = data.observaciones;
     if (data.estado       !== undefined) {
-      row[COLS.PARTES.ESTADO] = validateFromCatalogOrFallback('EstadoParte', data.estado);
+      row[schema.ESTADO] = validateFromCatalogOrFallback('EstadoParte', data.estado);
     }
 
-    row[COLS.PARTES.ULTIMA_MODIFICACION] = new Date();
-    row[COLS.PARTES.MODIFICADO_POR]      = user.email;
+    row[schema.ULTIMA_MODIFICACION] = new Date();
+    row[schema.MODIFICADO_POR]      = user.email;
 
     updateRow(CONFIG.SHEETS.PARTES, result.rowIndex, row);
     return ok({ id: id }, 'Parte actualizado.');
@@ -303,13 +405,15 @@ function duplicateParte(token, id) {
 function deleteParte(token, id) {
   try {
     requireAdminPermission(token);
-    var parteResult = findRow(CONFIG.SHEETS.PARTES, COLS.PARTES.ID, id);
+    var schema = getPartesSchema();
+    var parteId = normalizeIdKey(id);
+    var parteResult = findRow(CONFIG.SHEETS.PARTES, schema.ID, parteId);
     if (!parteResult) throw new Error('Parte no encontrado.');
 
     // 1. Adjuntos del parte — Drive + filas (recorrido inverso)
     var adjData = getAllRaw(CONFIG.SHEETS.ADJUNTOS);
     for (var j = adjData.length - 1; j >= 1; j--) {
-      if (adjData[j][COLS.ADJUNTOS.ID_PARTE] === id && adjData[j][COLS.ADJUNTOS.ID]) {
+      if (normalizeIdKey(adjData[j][COLS.ADJUNTOS.ID_PARTE]) === parteId && adjData[j][COLS.ADJUNTOS.ID]) {
         try { DriveApp.getFileById(adjData[j][COLS.ADJUNTOS.ID_DRIVE]).setTrashed(true); } catch (e) {}
         deleteRowByIndex(CONFIG.SHEETS.ADJUNTOS, j + 1);
       }
@@ -318,7 +422,7 @@ function deleteParte(token, id) {
     // 2. Incidencias del parte (recorrido inverso)
     var incData = getAllRaw(CONFIG.SHEETS.INCIDENCIAS);
     for (var i = incData.length - 1; i >= 1; i--) {
-      if (incData[i][COLS.INCIDENCIAS.ID_PARTE] === id && incData[i][COLS.INCIDENCIAS.ID]) {
+      if (normalizeIdKey(incData[i][COLS.INCIDENCIAS.ID_PARTE]) === parteId && incData[i][COLS.INCIDENCIAS.ID]) {
         deleteRowByIndex(CONFIG.SHEETS.INCIDENCIAS, i + 1);
       }
     }
