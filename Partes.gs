@@ -8,21 +8,47 @@
 function rowToParte(row) {
   var profesionalesList = parseListValue(row[COLS.PARTES.PROFESIONALES]);
   var areasList = parseListValue(row[COLS.PARTES.AREAS_IMPLICADAS]);
+  var normalizadas = normalizarSeparacionProfesionalesYAreas(profesionalesList, areasList);
   return {
     id:                  row[COLS.PARTES.ID],
     fechaInicio:         toISO(row[COLS.PARTES.FECHA_INICIO]),
     fechaFin:            toISO(row[COLS.PARTES.FECHA_FIN]),
     tipoPeriodo:         row[COLS.PARTES.TIPO_PERIODO],
-    profesionales:       profesionalesList.join(', '),
-    profesionalesLista:  profesionalesList,
-    areasImplicadas:     areasList.join(', '),
-    areasImplicadasLista: areasList,
+    profesionales:       normalizadas.profesionales.join(', '),
+    profesionalesLista:  normalizadas.profesionales,
+    areasImplicadas:     normalizadas.areas.join(', '),
+    areasImplicadasLista: normalizadas.areas,
     creadoPor:           row[COLS.PARTES.CREADO_POR],
     fechaCreacion:       toISO(row[COLS.PARTES.FECHA_CREACION]),
     ultimaModificacion:  toISO(row[COLS.PARTES.ULTIMA_MODIFICACION]),
     modificadoPor:       row[COLS.PARTES.MODIFICADO_POR],
     estado:              row[COLS.PARTES.ESTADO],
     observaciones:       row[COLS.PARTES.OBSERVACIONES]
+  };
+}
+
+/**
+ * Corrige histórico donde el campo Profesionales incluía áreas.
+ * Si un valor coincide con el catálogo de áreas, se mueve a areas.
+ */
+function normalizarSeparacionProfesionalesYAreas(profesionalesList, areasList) {
+  var profesionales = uniqueCaseInsensitive(parseListValue(profesionalesList));
+  var areas = uniqueCaseInsensitive(parseListValue(areasList));
+  var c = getCatalogos();
+  var areasCatalogo = (c && c.success && c.data && c.data.Area) ? c.data.Area : CONFIG.AREAS;
+
+  var profesionalesFiltrados = [];
+  profesionales.forEach(function(v) {
+    if (areasCatalogo.indexOf(v) !== -1) {
+      if (areas.indexOf(v) === -1) areas.push(v);
+      return;
+    }
+    profesionalesFiltrados.push(v);
+  });
+
+  return {
+    profesionales: uniqueCaseInsensitive(profesionalesFiltrados),
+    areas: uniqueCaseInsensitive(areas)
   };
 }
 
@@ -81,8 +107,11 @@ function createParte(token, data) {
 
     var tipoPeriodo = validateFromCatalogOrFallback('TipoPeriodo', data.tipoPeriodo);
     var estado = validateFromCatalogOrFallback('EstadoParte', data.estado || CONFIG.ESTADOS_PARTE.BORRADOR, CONFIG.ESTADOS_PARTE.BORRADOR);
-    var profesionales = normalizarProfesionalesParte(data.profesionales || data.profesionalesLista || []);
-    var areasImplicadas = normalizarAreasParte(data.areasImplicadas || data.areasImplicadasLista || []);
+    var profesionalesLista = parseListValue(data.profesionales || data.profesionalesLista || []);
+    var areasImplicadasLista = parseListValue(data.areasImplicadas || data.areasImplicadasLista || []);
+    var normalizadas = normalizarSeparacionProfesionalesYAreas(profesionalesLista, areasImplicadasLista);
+    var profesionales = normalizarProfesionalesParte(normalizadas.profesionales);
+    var areasImplicadas = normalizarAreasParte(normalizadas.areas);
 
     var id  = generateId('PG');
     var now = new Date();
@@ -202,15 +231,17 @@ function updateParte(token, id, data) {
     if (data.tipoPeriodo  !== undefined) {
       row[COLS.PARTES.TIPO_PERIODO] = validateFromCatalogOrFallback('TipoPeriodo', data.tipoPeriodo);
     }
-    if (data.profesionales!== undefined || data.profesionalesLista !== undefined) {
-      row[COLS.PARTES.PROFESIONALES] = normalizarProfesionalesParte(
-        data.profesionalesLista !== undefined ? data.profesionalesLista : data.profesionales
-      );
-    }
-    if (data.areasImplicadas !== undefined || data.areasImplicadasLista !== undefined) {
-      row[COLS.PARTES.AREAS_IMPLICADAS] = normalizarAreasParte(
-        data.areasImplicadasLista !== undefined ? data.areasImplicadasLista : data.areasImplicadas
-      );
+    if (data.profesionales!== undefined || data.profesionalesLista !== undefined ||
+        data.areasImplicadas !== undefined || data.areasImplicadasLista !== undefined) {
+      var profInput = data.profesionalesLista !== undefined
+        ? data.profesionalesLista
+        : (data.profesionales !== undefined ? data.profesionales : row[COLS.PARTES.PROFESIONALES]);
+      var areasInput = data.areasImplicadasLista !== undefined
+        ? data.areasImplicadasLista
+        : (data.areasImplicadas !== undefined ? data.areasImplicadas : row[COLS.PARTES.AREAS_IMPLICADAS]);
+      var normalizadasUpdate = normalizarSeparacionProfesionalesYAreas(profInput, areasInput);
+      row[COLS.PARTES.PROFESIONALES] = normalizarProfesionalesParte(normalizadasUpdate.profesionales);
+      row[COLS.PARTES.AREAS_IMPLICADAS] = normalizarAreasParte(normalizadasUpdate.areas);
     }
     if (data.observaciones!== undefined) row[COLS.PARTES.OBSERVACIONES] = data.observaciones;
     if (data.estado       !== undefined) {
