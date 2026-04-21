@@ -400,6 +400,9 @@
         <button class="btn btn-outline-secondary btn-sm" id="btn-cerrar-parte" onclick="cerrarParte()">
           <i class="bi bi-lock me-1"></i>Cerrar parte
         </button>
+        <button class="btn btn-outline-warning btn-sm" id="btn-reabrir-parte" onclick="reabrirParte()" style="display:none;">
+          <i class="bi bi-lock-fill me-1"></i>Reabrir parte
+        </button>
         <button class="btn btn-outline-secondary btn-sm" onclick="duplicarParte()">
           <i class="bi bi-copy me-1"></i>Duplicar
         </button>
@@ -1301,6 +1304,15 @@ function llamar(fnName, args, spinnerMsg, onSuccess, onError) {
       hideSpinner();
       if (!result || !result.success) {
         var msg = (result && result.message) || 'Error desconocido';
+        var low = msg.toLowerCase();
+        if (low.indexOf('sesión') !== -1 &&
+            (low.indexOf('expirada') !== -1 || low.indexOf('no válida') !== -1 || low.indexOf('no hay sesión') !== -1)) {
+          APP.token = null;
+          sessionStorage.removeItem('gf_token');
+          toast('Tu sesión ha expirado. Por favor, vuelve a iniciar sesión.', 'warning');
+          setTimeout(mostrarLogin, 1200);
+          return;
+        }
         toast(msg, 'danger');
         if (onError) onError(msg);
       } else {
@@ -1614,8 +1626,10 @@ function abrirParte(id) {
     var canEdit = APP.user && (APP.user.rol==='admin' || APP.user.rol==='editor');
     var cerrado = p.estado === 'cerrado';
 
-    document.getElementById('btn-editar-parte').style.display  = canEdit ? '' : 'none';
-    document.getElementById('btn-cerrar-parte').style.display  = (canEdit && !cerrado) ? '' : 'none';
+    var isAdmin = APP.user && APP.user.rol === 'admin';
+    document.getElementById('btn-editar-parte').style.display   = canEdit ? '' : 'none';
+    document.getElementById('btn-cerrar-parte').style.display   = (canEdit && !cerrado) ? '' : 'none';
+    document.getElementById('btn-reabrir-parte').style.display  = (isAdmin && cerrado) ? '' : 'none';
     document.getElementById('btn-nueva-incidencia').style.display = canEdit ? '' : 'none';
 
     APP.parteIncidencias = data.incidencias || [];
@@ -1644,10 +1658,19 @@ function renderIncidencias() {
     return;
   }
 
+  var estadosOpts = ['abierta','resuelta','informativa','cerrada'];
+
   cont.innerHTML = lista.map(function(inc) {
     var prioClass = 'prio-' + (inc.prioridad||'media').replace('í','i');
-    var btns = canEdit
-      ? '<button class="btn btn-outline-secondary btn-sm py-0 me-1" onclick="abrirModalIncidencia(\'' + inc.id + '\')" title="Editar"><i class="bi bi-pencil"></i></button>'
+
+    var acciones = canEdit
+      ? '<button class="btn btn-outline-secondary btn-sm py-0" onclick="abrirModalIncidencia(\'' + inc.id + '\')" title="Editar"><i class="bi bi-pencil"></i></button>' +
+        '<select class="form-select form-select-sm mt-1" style="font-size:.72rem;padding:.15rem .4rem;" ' +
+          'onchange="cambiarEstadoIncidencia(\'' + inc.id + '\', this.value)" title="Cambiar estado">' +
+          estadosOpts.map(function(e) {
+            return '<option value="' + e + '"' + (inc.estado === e ? ' selected' : '') + '>' + e + '</option>';
+          }).join('') +
+        '</select>'
       : '';
 
     return '<div class="inc-card ' + prioClass + '">' +
@@ -1657,7 +1680,7 @@ function renderIncidencias() {
             '<span class="text-muted small"><i class="bi bi-clock me-1"></i>' + fmtDT(inc.fechaEvento) + '</span>' +
             '<span class="badge bg-light text-dark border small">' + (inc.area||'—') + '</span>' +
             '<span class="badge bg-light text-dark border small">' + (inc.tipoEntrada||'—') + '</span>' +
-            badgePrio(inc.prioridad) + ' ' + badgeEstado(inc.estado) +
+            badgePrio(inc.prioridad) +
           '</div>' +
           '<p class="mb-1 small fw-semibold">' + escHtml(inc.descripcion||'—') + '</p>' +
           (inc.actuacion ? '<p class="mb-1 small text-muted"><i class="bi bi-arrow-return-right me-1"></i>' + escHtml(truncar(inc.actuacion, 200)) + '</p>' : '') +
@@ -1665,14 +1688,23 @@ function renderIncidencias() {
           (inc.servicio ? '<p class="mb-0 small text-muted"><i class="bi bi-building me-1"></i>' + escHtml(inc.servicio) + '</p>' : '') +
           (inc.seguimiento ? '<p class="mb-0 small text-warning-emphasis"><i class="bi bi-arrow-right-circle me-1"></i>' + escHtml(truncar(inc.seguimiento,150)) + '</p>' : '') +
         '</div>' +
-        '<div class="d-flex flex-column align-items-end gap-1">' +
-          btns +
-          '<span class="text-muted" style="font-size:.72rem;">' + (inc.registradoPor||'—') + '</span>' +
+        '<div class="d-flex flex-column align-items-end gap-1" style="min-width:90px;">' +
+          acciones +
+          '<span class="text-muted mt-1" style="font-size:.72rem;">' + (inc.registradoPor||'—') + '</span>' +
           (inc.tieneAdjuntos ? '<span class="small text-secondary"><i class="bi bi-paperclip"></i> adj.</span>' : '') +
         '</div>' +
       '</div>' +
     '</div>';
   }).join('');
+}
+
+function cambiarEstadoIncidencia(incId, nuevoEstado) {
+  llamarW('updateEstadoIncidencia', [incId, nuevoEstado], null, function() {
+    // Actualiza la caché local para evitar un re-fetch completo
+    var inc = APP.parteIncidencias.find(function(i){ return i.id === incId; });
+    if (inc) inc.estado = nuevoEstado;
+    toast('Estado actualizado: ' + nuevoEstado, 'success');
+  });
 }
 
 function escHtml(s) {
@@ -1684,6 +1716,15 @@ function cerrarParte() {
   confirmar('Cerrar parte', '¿Cerrar este parte? No podrá ser editado por usuarios no administradores.', function() {
     llamarW('closeParte', [APP.currentParteId], 'Cerrando…', function() {
       toast('Parte cerrado correctamente.', 'success');
+      abrirParte(APP.currentParteId);
+    });
+  });
+}
+
+function reabrirParte() {
+  confirmar('Reabrir parte', '¿Reabrir este parte cerrado? Quedará en estado Borrador y podrá editarse.', function() {
+    llamarW('reopenParte', [APP.currentParteId], 'Reabriendo…', function() {
+      toast('Parte reabierto correctamente.', 'success');
       abrirParte(APP.currentParteId);
     });
   });
