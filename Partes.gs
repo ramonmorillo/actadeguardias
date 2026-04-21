@@ -84,6 +84,37 @@ function listPartes(limit) {
   }
 }
 
+/**
+ * Como listPartes pero añade numIncidencias a cada parte.
+ * Usa una sola pasada por la hoja de incidencias para evitar N llamadas.
+ */
+function listPartesConConteo(limit) {
+  try {
+    var partesRaw = getAllRaw(CONFIG.SHEETS.PARTES);
+    if (partesRaw.length <= 1) return ok([]);
+
+    var partes = partesRaw.slice(1)
+      .filter(function(r) { return !!r[COLS.PARTES.ID]; })
+      .map(rowToParte);
+
+    // Contar incidencias por parte en una sola lectura
+    var incRaw = getAllRaw(CONFIG.SHEETS.INCIDENCIAS);
+    var conteo = {};
+    for (var i = 1; i < incRaw.length; i++) {
+      var pid = incRaw[i][COLS.INCIDENCIAS.ID_PARTE];
+      if (pid) conteo[pid] = (conteo[pid] || 0) + 1;
+    }
+
+    partes.forEach(function(p) { p.numIncidencias = conteo[p.id] || 0; });
+    partes.sort(function(a, b) { return new Date(b.fechaCreacion) - new Date(a.fechaCreacion); });
+    if (limit) partes = partes.slice(0, limit);
+    return ok(partes);
+  } catch (e) {
+    logErr('listPartesConConteo', e);
+    return fail(e.message);
+  }
+}
+
 function getParteConIncidencias(id) {
   try {
     var p = getParte(id);

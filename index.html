@@ -292,7 +292,7 @@
           <thead>
             <tr>
               <th>ID</th><th>Periodo</th><th>Tipo</th>
-              <th>Profesionales</th><th>Estado</th><th>Creado por</th><th></th>
+              <th>Profesionales</th><th class="text-center">Inc.</th><th>Estado</th><th>Creado por</th><th></th>
             </tr>
           </thead>
           <tbody id="dash-partes-body">
@@ -302,8 +302,8 @@
       </div>
     </div>
 
-    <!-- Incidencias críticas/abiertas recientes -->
-    <div class="table-card">
+    <!-- Incidencias abiertas recientes -->
+    <div class="table-card mb-4">
       <div class="d-flex align-items-center px-3 py-2 border-bottom">
         <span class="fw-semibold"><i class="bi bi-exclamation-circle me-1 text-danger"></i>Incidencias abiertas recientes</span>
         <a href="#" class="ms-auto small text-primary" onclick="showView('busqueda')">Buscar más</a>
@@ -318,6 +318,27 @@
           </thead>
           <tbody id="dash-incidencias-body">
             <tr><td colspan="7" class="text-center text-muted py-3">Cargando…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Pendientes de seguimiento -->
+    <div class="table-card">
+      <div class="d-flex align-items-center px-3 py-2 border-bottom">
+        <span class="fw-semibold"><i class="bi bi-arrow-right-circle me-1 text-warning"></i>Pendientes de seguimiento</span>
+        <a href="#" class="ms-auto small text-primary"
+           onclick="document.getElementById('bq-adjuntos').value='';document.getElementById('bq-texto').value='';showView('busqueda')">Ver en búsqueda</a>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead>
+            <tr>
+              <th>Fecha</th><th>Área</th><th>Seguimiento pendiente</th><th>Prioridad</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="dash-seguimiento-body">
+            <tr><td colspan="5" class="text-center text-muted py-3">Cargando…</td></tr>
           </tbody>
         </table>
       </div>
@@ -1541,16 +1562,25 @@ function guardarPassword() {
 // ══════════════════════════════════════════════════════
 
 function cargarDashboard() {
-  llamar('listPartes', [8], 'Cargando panel…', function(partes) {
+  var ahora  = new Date();
+  var hace90 = new Date(ahora); hace90.setDate(ahora.getDate() - 90);
+  var fmt = function(d){ return d.toISOString().substr(0, 10); };
+  var kpiParams = { fechaDesde: fmt(hace90), fechaHasta: fmt(ahora) };
+
+  llamar('listPartesConConteo', [8], 'Cargando panel…', function(partes) {
     renderDashPartes(partes);
   });
-  llamar('getEstadisticas', [{}], null, function(est) {
+  llamar('getEstadisticas', [kpiParams], null, function(est) {
     document.getElementById('kpi-partes').textContent    = est.totalPartes;
     document.getElementById('kpi-abiertas').textContent  = est.abiertas;
     document.getElementById('kpi-criticas').textContent  = est.criticas;
     document.getElementById('kpi-resueltas').textContent = est.resueltas;
-    renderDashIncidencias(est);
+    renderDashIncidencias();
   });
+  // Pendientes de seguimiento
+  llamar('searchIncidencias', [{ conSeguimiento: true, pageSize: 6, page: 1 }], null,
+    function(res) { renderDashSeguimiento(res.resultados || []); }
+  );
 }
 
 function renderDashPartes(partes) {
@@ -1565,6 +1595,7 @@ function renderDashPartes(partes) {
       '<td class="small">' + fmtD(p.fechaInicio) + ' – ' + fmtD(p.fechaFin) + '</td>' +
       '<td class="small">' + (p.tipoPeriodo||'—') + '</td>' +
       '<td class="small">' + truncar(p.profesionales, 35) + '</td>' +
+      '<td class="text-center small">' + (p.numIncidencias !== undefined ? p.numIncidencias : '—') + '</td>' +
       '<td>' + badgeEstado(p.estado) + '</td>' +
       '<td class="small text-muted">' + (p.creadoPor||'—') + '</td>' +
       '<td><button class="btn btn-outline-primary btn-sm py-0" onclick="abrirParte(\'' + p.id + '\')"><i class="bi bi-eye"></i></button></td>' +
@@ -1572,13 +1603,12 @@ function renderDashPartes(partes) {
   }).join('');
 }
 
-function renderDashIncidencias(est) {
-  // Cargamos incidencias abiertas buscando con filtro estado=abierta
+function renderDashIncidencias() {
   llamar('searchIncidencias', [{ estado:'abierta', pageSize:8, page:1 }], null, function(res) {
     var tbody = document.getElementById('dash-incidencias-body');
     var incs = res.resultados || [];
     if (!incs.length) {
-      tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">Sin incidencias abiertas. ✔</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">Sin incidencias abiertas. ✓</td></tr>';
       return;
     }
     tbody.innerHTML = incs.map(function(i) {
@@ -1595,12 +1625,30 @@ function renderDashIncidencias(est) {
   });
 }
 
+function renderDashSeguimiento(incs) {
+  var cont = document.getElementById('dash-seguimiento-body');
+  if (!cont) return;
+  if (!incs.length) {
+    cont.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">Sin pendientes de seguimiento. ✓</td></tr>';
+    return;
+  }
+  cont.innerHTML = incs.map(function(i) {
+    return '<tr>' +
+      '<td class="small">' + fmtDT(i.fechaEvento) + '</td>' +
+      '<td class="small">' + (i.area||'—') + '</td>' +
+      '<td class="small text-warning-emphasis fw-semibold">' + truncar(i.seguimiento, 80) + '</td>' +
+      '<td>' + badgePrio(i.prioridad) + '</td>' +
+      '<td><button class="btn btn-outline-secondary btn-sm py-0" onclick="abrirParte(\'' + i.idParte + '\')"><i class="bi bi-box-arrow-up-right"></i></button></td>' +
+    '</tr>';
+  }).join('');
+}
+
 // ══════════════════════════════════════════════════════
 //  HISTÓRICO
 // ══════════════════════════════════════════════════════
 
 function cargarHistorico() {
-  llamar('listPartes', [], 'Cargando histórico…', function(partes) {
+  llamar('listPartesConConteo', [], 'Cargando histórico…', function(partes) {
     APP.histAllPartes = partes || [];
     filtrarHistorico();
   });
@@ -1640,7 +1688,7 @@ function filtrarHistorico() {
       '<td class="small">' + fmtDT(p.fechaFin)    + '</td>' +
       '<td class="small">' + (p.tipoPeriodo||'—')  + '</td>' +
       '<td class="small">' + truncar(p.profesionales, 30) + '</td>' +
-      '<td class="text-center">—</td>' +
+      '<td class="text-center small">' + (p.numIncidencias !== undefined ? p.numIncidencias : '—') + '</td>' +
       '<td>' + badgeEstado(p.estado) + '</td>' +
       '<td class="small text-muted">' + (p.creadoPor||'—') + '</td>' +
       '<td class="text-end">' +

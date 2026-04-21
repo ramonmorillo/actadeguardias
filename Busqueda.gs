@@ -113,7 +113,9 @@ function matchesFiltros(row, f, partesMap) {
   }
 
   // Tiene adjuntos
-  if (f.conAdjuntos === true && !row[COLS.INCIDENCIAS.TIENE_ADJUNTOS]) return false;
+  if (f.conAdjuntos   === true && !row[COLS.INCIDENCIAS.TIENE_ADJUNTOS]) return false;
+  // Tiene texto de seguimiento pendiente
+  if (f.conSeguimiento === true && !row[COLS.INCIDENCIAS.SEGUIMIENTO])   return false;
 
   return true;
 }
