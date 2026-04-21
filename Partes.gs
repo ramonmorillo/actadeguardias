@@ -6,20 +6,16 @@
 // ── Mapper fila → objeto ───────────────────────────────────────────────────
 
 function getPartesSchema() {
-  var raw = getAllRaw(CONFIG.SHEETS.PARTES);
-  var headers = (raw && raw.length) ? raw[0] : [];
-  var map = {};
-  headers.forEach(function(h, i) {
-    var key = (h || '').toString().toLowerCase().replace(/\s+/g, '');
-    map[key] = i;
-  });
+  var headers = getHeaders(CONFIG.SHEETS.PARTES);
+  var map = buildHeaderMap(headers);
 
   var hasAreasCol = map['areasimplicadas'] !== undefined;
   var shiftIfLegacy = hasAreasCol ? 0 : -1; // histórico sin AreasImplicadas
 
   var findIdx = function(posibles, fallback) {
     for (var i = 0; i < posibles.length; i++) {
-      if (map[posibles[i]] !== undefined) return map[posibles[i]];
+      var key = normalizeHeaderKey(posibles[i]);
+      if (map[key] !== undefined) return map[key];
     }
     return fallback;
   };
@@ -49,10 +45,6 @@ function ensureAreasImplicadasColumn() {
   sheet.insertColumnAfter(insertAfter);
   sheet.getRange(1, insertAfter + 1).setValue('AreasImplicadas');
   return getPartesSchema();
-}
-
-function rowVal(row, idx) {
-  return (idx >= 0 && idx < row.length) ? row[idx] : '';
 }
 
 function rowToParte(row, opts) {
@@ -413,6 +405,8 @@ function deleteParte(token, id) {
   try {
     requireAdminPermission(token);
     var schema = getPartesSchema();
+    var schemaAdj = getAdjuntosSchema();
+    var schemaInc = getIncidenciasSchema();
     var parteId = normalizeIdKey(id);
     var parteResult = findRow(CONFIG.SHEETS.PARTES, schema.ID, parteId);
     if (!parteResult) throw new Error('Parte no encontrado.');
@@ -420,8 +414,8 @@ function deleteParte(token, id) {
     // 1. Adjuntos del parte — Drive + filas (recorrido inverso)
     var adjData = getAllRaw(CONFIG.SHEETS.ADJUNTOS);
     for (var j = adjData.length - 1; j >= 1; j--) {
-      if (normalizeIdKey(adjData[j][COLS.ADJUNTOS.ID_PARTE]) === parteId && adjData[j][COLS.ADJUNTOS.ID]) {
-        try { DriveApp.getFileById(adjData[j][COLS.ADJUNTOS.ID_DRIVE]).setTrashed(true); } catch (e) {}
+      if (normalizeIdKey(rowVal(adjData[j], schemaAdj.ID_PARTE)) === parteId && rowVal(adjData[j], schemaAdj.ID)) {
+        try { DriveApp.getFileById(rowVal(adjData[j], schemaAdj.ID_DRIVE)).setTrashed(true); } catch (e) {}
         deleteRowByIndex(CONFIG.SHEETS.ADJUNTOS, j + 1);
       }
     }
@@ -429,7 +423,7 @@ function deleteParte(token, id) {
     // 2. Incidencias del parte (recorrido inverso)
     var incData = getAllRaw(CONFIG.SHEETS.INCIDENCIAS);
     for (var i = incData.length - 1; i >= 1; i--) {
-      if (normalizeIdKey(incData[i][COLS.INCIDENCIAS.ID_PARTE]) === parteId && incData[i][COLS.INCIDENCIAS.ID]) {
+      if (normalizeIdKey(rowVal(incData[i], schemaInc.ID_PARTE)) === parteId && rowVal(incData[i], schemaInc.ID)) {
         deleteRowByIndex(CONFIG.SHEETS.INCIDENCIAS, i + 1);
       }
     }

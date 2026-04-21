@@ -183,3 +183,73 @@ function stringifyListValue(list) {
 function displayListValue(value) {
   return parseListValue(value).join(', ');
 }
+
+// ── Normalización de cabeceras y esquemas de hoja ─────────────────────────
+
+function normalizeHeaderKey(value) {
+  return (value || '').toString().toLowerCase().replace(/[\s_\-]+/g, '');
+}
+
+function getHeaders(sheetName) {
+  var raw = getAllRaw(sheetName);
+  return (raw && raw.length) ? raw[0] : [];
+}
+
+function buildHeaderMap(headers) {
+  var map = {};
+  (headers || []).forEach(function(h, i) {
+    map[normalizeHeaderKey(h)] = i;
+  });
+  return map;
+}
+
+function resolveColumnIndex(headerMap, aliases, fallback) {
+  for (var i = 0; i < aliases.length; i++) {
+    var key = normalizeHeaderKey(aliases[i]);
+    if (headerMap[key] !== undefined) return headerMap[key];
+  }
+  return fallback;
+}
+
+function rowVal(row, idx) {
+  return (idx >= 0 && row && idx < row.length) ? row[idx] : '';
+}
+
+function getUsuariosSchema() {
+  var map = buildHeaderMap(getHeaders(CONFIG.SHEETS.USUARIOS));
+  return {
+    EMAIL: resolveColumnIndex(map, ['Email'], COLS.USUARIOS.EMAIL),
+    NOMBRE: resolveColumnIndex(map, ['Nombre'], COLS.USUARIOS.NOMBRE),
+    ROL: resolveColumnIndex(map, ['Rol'], COLS.USUARIOS.ROL),
+    ACTIVO: resolveColumnIndex(map, ['Activo'], COLS.USUARIOS.ACTIVO),
+    PASSWORD: resolveColumnIndex(map, ['Password'], COLS.USUARIOS.PASSWORD),
+    FECHA_ALTA: resolveColumnIndex(map, ['FechaAlta', 'FechaAltaUsuario'], COLS.USUARIOS.FECHA_ALTA)
+  };
+}
+
+function getCatalogosSchema() {
+  var map = buildHeaderMap(getHeaders(CONFIG.SHEETS.CATALOGOS));
+  return {
+    TIPO: resolveColumnIndex(map, ['Tipo'], COLS.CATALOGOS.TIPO),
+    VALOR: resolveColumnIndex(map, ['Valor'], COLS.CATALOGOS.VALOR),
+    DESCRIPCION: resolveColumnIndex(map, ['Descripcion'], COLS.CATALOGOS.DESCRIPCION),
+    ACTIVO: resolveColumnIndex(map, ['Activo'], COLS.CATALOGOS.ACTIVO),
+    ORDEN: resolveColumnIndex(map, ['Orden'], COLS.CATALOGOS.ORDEN)
+  };
+}
+
+function getAdjuntosSchema() {
+  var map = buildHeaderMap(getHeaders(CONFIG.SHEETS.ADJUNTOS));
+  return {
+    ID: resolveColumnIndex(map, ['ID'], COLS.ADJUNTOS.ID),
+    ID_INCIDENCIA: resolveColumnIndex(map, ['IDIncidencia'], COLS.ADJUNTOS.ID_INCIDENCIA),
+    ID_PARTE: resolveColumnIndex(map, ['IDParte'], COLS.ADJUNTOS.ID_PARTE),
+    NOMBRE_ARCHIVO: resolveColumnIndex(map, ['NombreArchivo'], COLS.ADJUNTOS.NOMBRE_ARCHIVO),
+    URL_DRIVE: resolveColumnIndex(map, ['URLDrive'], COLS.ADJUNTOS.URL_DRIVE),
+    ID_DRIVE: resolveColumnIndex(map, ['IDDrive'], COLS.ADJUNTOS.ID_DRIVE),
+    FECHA_SUBIDA: resolveColumnIndex(map, ['FechaSubida'], COLS.ADJUNTOS.FECHA_SUBIDA),
+    SUBIDO_POR: resolveColumnIndex(map, ['SubidoPor'], COLS.ADJUNTOS.SUBIDO_POR),
+    TIPO_ARCHIVO: resolveColumnIndex(map, ['TipoArchivo'], COLS.ADJUNTOS.TIPO_ARCHIVO),
+    TAMANYO: resolveColumnIndex(map, ['Tamanyo', 'Tamaño'], COLS.ADJUNTOS.TAMANYO)
+  };
+}

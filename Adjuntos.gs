@@ -22,18 +22,19 @@ function getDriveFolderId() {
 // ── Mapper fila → objeto ───────────────────────────────────────────────────
 
 function rowToAdjunto(row) {
+  var schemaAdj = getAdjuntosSchema();
   return {
-    id:           row[COLS.ADJUNTOS.ID],
-    idIncidencia: row[COLS.ADJUNTOS.ID_INCIDENCIA],
-    idParte:      row[COLS.ADJUNTOS.ID_PARTE],
-    nombre:       row[COLS.ADJUNTOS.NOMBRE_ARCHIVO],
-    url:          row[COLS.ADJUNTOS.URL_DRIVE],
-    idDrive:      row[COLS.ADJUNTOS.ID_DRIVE],
-    fechaSubida:  toISO(row[COLS.ADJUNTOS.FECHA_SUBIDA]),
-    subidoPor:    row[COLS.ADJUNTOS.SUBIDO_POR],
-    tipo:         row[COLS.ADJUNTOS.TIPO_ARCHIVO],
-    tamanyo:      row[COLS.ADJUNTOS.TAMANYO],
-    tamanyoLegible: formatBytes(row[COLS.ADJUNTOS.TAMANYO])
+    id:           rowVal(row, schemaAdj.ID),
+    idIncidencia: rowVal(row, schemaAdj.ID_INCIDENCIA),
+    idParte:      rowVal(row, schemaAdj.ID_PARTE),
+    nombre:       rowVal(row, schemaAdj.NOMBRE_ARCHIVO),
+    url:          rowVal(row, schemaAdj.URL_DRIVE),
+    idDrive:      rowVal(row, schemaAdj.ID_DRIVE),
+    fechaSubida:  toISO(rowVal(row, schemaAdj.FECHA_SUBIDA)),
+    subidoPor:    rowVal(row, schemaAdj.SUBIDO_POR),
+    tipo:         rowVal(row, schemaAdj.TIPO_ARCHIVO),
+    tamanyo:      rowVal(row, schemaAdj.TAMANYO),
+    tamanyoLegible: formatBytes(rowVal(row, schemaAdj.TAMANYO))
   };
 }
 
@@ -99,11 +100,13 @@ function uploadAdjunto(token, incidenciaId, parteId, fileName, base64Data, mimeT
 
 function getAdjuntosByIncidencia(incidenciaId) {
   try {
+    var schemaAdj = getAdjuntosSchema();
     var data = getAllRaw(CONFIG.SHEETS.ADJUNTOS);
     if (data.length <= 1) return ok([]);
     var list = [];
     for (var i = 1; i < data.length; i++) {
-      if (data[i][COLS.ADJUNTOS.ID_INCIDENCIA] === incidenciaId && data[i][COLS.ADJUNTOS.ID]) {
+      if (normalizeIdKey(rowVal(data[i], schemaAdj.ID_INCIDENCIA)) === normalizeIdKey(incidenciaId) &&
+          rowVal(data[i], schemaAdj.ID)) {
         list.push(rowToAdjunto(data[i]));
       }
     }
@@ -116,11 +119,13 @@ function getAdjuntosByIncidencia(incidenciaId) {
 
 function getAdjuntosByParte(parteId) {
   try {
+    var schemaAdj = getAdjuntosSchema();
     var data = getAllRaw(CONFIG.SHEETS.ADJUNTOS);
     if (data.length <= 1) return ok([]);
     var list = [];
     for (var i = 1; i < data.length; i++) {
-      if (data[i][COLS.ADJUNTOS.ID_PARTE] === parteId && data[i][COLS.ADJUNTOS.ID]) {
+      if (normalizeIdKey(rowVal(data[i], schemaAdj.ID_PARTE)) === normalizeIdKey(parteId) &&
+          rowVal(data[i], schemaAdj.ID)) {
         list.push(rowToAdjunto(data[i]));
       }
     }
@@ -136,12 +141,13 @@ function getAdjuntosByParte(parteId) {
 function deleteAdjunto(token, id) {
   try {
     requireEditPermission(token);
-    var result = findRow(CONFIG.SHEETS.ADJUNTOS, COLS.ADJUNTOS.ID, id);
+    var schemaAdj = getAdjuntosSchema();
+    var result = findRow(CONFIG.SHEETS.ADJUNTOS, schemaAdj.ID, normalizeIdKey(id));
     if (!result) throw new Error('Adjunto no encontrado.');
 
     // Mover a papelera en Drive (no elimina permanentemente)
     try {
-      DriveApp.getFileById(result.row[COLS.ADJUNTOS.ID_DRIVE]).setTrashed(true);
+      DriveApp.getFileById(rowVal(result.row, schemaAdj.ID_DRIVE)).setTrashed(true);
     } catch (e) { /* el archivo ya no existe en Drive */ }
 
     deleteRowByIndex(CONFIG.SHEETS.ADJUNTOS, result.rowIndex);

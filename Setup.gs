@@ -106,9 +106,10 @@ function addSampleUsuarios(ss) {
  * Ejecutar manualmente desde el editor de Apps Script si hace falta resetear.
  */
 function resetearPasswordManual(email, nuevaPassword) {
-  var result = findRow(CONFIG.SHEETS.USUARIOS, COLS.USUARIOS.EMAIL, email.toLowerCase());
+  var schemaUsers = getUsuariosSchema();
+  var result = findRow(CONFIG.SHEETS.USUARIOS, schemaUsers.EMAIL, email.toLowerCase());
   if (!result) throw new Error('Usuario no encontrado: ' + email);
-  setCellValue(CONFIG.SHEETS.USUARIOS, result.rowIndex, COLS.USUARIOS.PASSWORD, nuevaPassword);
+  setCellValue(CONFIG.SHEETS.USUARIOS, result.rowIndex, schemaUsers.PASSWORD, nuevaPassword);
   console.log('Contraseña actualizada para: ' + email);
 }
 
@@ -229,19 +230,20 @@ function addSampleIncidencias(ss, id1, id2, sab1, sab2) {
 function getCatalogosAdmin(token) {
   try {
     requireAdminPermission(token);
+    var schemaCat = getCatalogosSchema();
     var data = getAllRaw(CONFIG.SHEETS.CATALOGOS);
     if (data.length <= 1) return ok([]);
     var items = [];
     for (var i = 1; i < data.length; i++) {
       var row = data[i];
-      if (!row[COLS.CATALOGOS.TIPO]) continue;
+      if (!rowVal(row, schemaCat.TIPO)) continue;
       items.push({
         rowIndex:   i + 1,
-        tipo:       row[COLS.CATALOGOS.TIPO],
-        valor:      row[COLS.CATALOGOS.VALOR],
-        descripcion:row[COLS.CATALOGOS.DESCRIPCION],
-        activo:     !!row[COLS.CATALOGOS.ACTIVO],
-        orden:      row[COLS.CATALOGOS.ORDEN]
+        tipo:       rowVal(row, schemaCat.TIPO),
+        valor:      rowVal(row, schemaCat.VALOR),
+        descripcion:rowVal(row, schemaCat.DESCRIPCION),
+        activo:     !!rowVal(row, schemaCat.ACTIVO),
+        orden:      rowVal(row, schemaCat.ORDEN)
       });
     }
     return ok(items);
@@ -255,13 +257,14 @@ function getCatalogosAdmin(token) {
 function addCatalogItem(token, tipo, valor, descripcion) {
   try {
     requireAdminPermission(token);
+    var schemaCat = getCatalogosSchema();
     if (!tipo || !valor) throw new Error('Tipo y valor son obligatorios.');
     // Calcular siguiente orden dentro del tipo
     var data = getAllRaw(CONFIG.SHEETS.CATALOGOS);
     var maxOrden = 0;
     for (var i = 1; i < data.length; i++) {
-      if (data[i][COLS.CATALOGOS.TIPO] === tipo) {
-        maxOrden = Math.max(maxOrden, data[i][COLS.CATALOGOS.ORDEN] || 0);
+      if (rowVal(data[i], schemaCat.TIPO) === tipo) {
+        maxOrden = Math.max(maxOrden, rowVal(data[i], schemaCat.ORDEN) || 0);
       }
     }
     appendRow(CONFIG.SHEETS.CATALOGOS, [tipo, valor, descripcion || '', true, maxOrden + 1]);
@@ -276,11 +279,12 @@ function addCatalogItem(token, tipo, valor, descripcion) {
 function toggleCatalogItem(token, tipo, valor) {
   try {
     requireAdminPermission(token);
+    var schemaCat = getCatalogosSchema();
     var data = getAllRaw(CONFIG.SHEETS.CATALOGOS);
     for (var i = 1; i < data.length; i++) {
-      if (data[i][COLS.CATALOGOS.TIPO] === tipo && data[i][COLS.CATALOGOS.VALOR] === valor) {
-        var current = !!data[i][COLS.CATALOGOS.ACTIVO];
-        setCellValue(CONFIG.SHEETS.CATALOGOS, i + 1, COLS.CATALOGOS.ACTIVO, !current);
+      if (rowVal(data[i], schemaCat.TIPO) === tipo && rowVal(data[i], schemaCat.VALOR) === valor) {
+        var current = !!rowVal(data[i], schemaCat.ACTIVO);
+        setCellValue(CONFIG.SHEETS.CATALOGOS, i + 1, schemaCat.ACTIVO, !current);
         return ok(null, current ? 'Ítem desactivado.' : 'Ítem activado.');
       }
     }
@@ -295,6 +299,7 @@ function toggleCatalogItem(token, tipo, valor) {
 
 function getCatalogos() {
   try {
+    var schemaCat = getCatalogosSchema();
     var data = getAllRaw(CONFIG.SHEETS.CATALOGOS);
     if (data.length <= 1) {
       return ok({
@@ -310,14 +315,50 @@ function getCatalogos() {
     var cat = {};
     for (var i = 1; i < data.length; i++) {
       var row = data[i];
-      if (!row[COLS.CATALOGOS.ACTIVO]) continue;
-      var tipo = row[COLS.CATALOGOS.TIPO];
+      if (!rowVal(row, schemaCat.ACTIVO)) continue;
+      var tipo = rowVal(row, schemaCat.TIPO);
       if (!cat[tipo]) cat[tipo] = [];
-      cat[tipo].push(row[COLS.CATALOGOS.VALOR]);
+      cat[tipo].push(rowVal(row, schemaCat.VALOR));
     }
     return ok(cat);
   } catch (e) {
     logErr('getCatalogos', e);
     return fail(e.message);
   }
+}
+
+/**
+ * Reparación integral del modelo de datos para entornos con columnas legacy.
+ * Reordena cabeceras al formato oficial y normaliza valores históricos mínimos.
+ */
+function repararModeloDatos() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  Object.keys(HEADERS).forEach(function(key) {
+    var sheetName = CONFIG.SHEETS[key];
+    var sh = ss.getSheetByName(sheetName);
+    if (!sh) return;
+    var targetHeaders = HEADERS[key];
+    var current = getHeaders(sheetName);
+    if (current.length < targetHeaders.length) {
+      sh.insertColumnsAfter(sh.getLastColumn(), targetHeaders.length - current.length);
+    }
+    sh.getRange(1, 1, 1, targetHeaders.length).setValues([targetHeaders]);
+  });
+
+  // Normaliza histórico de partes: separa áreas incrustadas en profesionales
+  var schemaPartes = getPartesSchema();
+  var c = getCatalogos();
+  var areasCatalogo = (c && c.success && c.data && c.data.Area) ? c.data.Area : CONFIG.AREAS;
+  var partesRaw = getAllRaw(CONFIG.SHEETS.PARTES);
+  for (var i = 1; i < partesRaw.length; i++) {
+    if (!rowVal(partesRaw[i], schemaPartes.ID)) continue;
+    var normalizadas = normalizarSeparacionProfesionalesYAreas(
+      rowVal(partesRaw[i], schemaPartes.PROFESIONALES),
+      rowVal(partesRaw[i], schemaPartes.AREAS_IMPLICADAS),
+      areasCatalogo
+    );
+    setCellValue(CONFIG.SHEETS.PARTES, i + 1, schemaPartes.PROFESIONALES, stringifyListValue(normalizadas.profesionales));
+    setCellValue(CONFIG.SHEETS.PARTES, i + 1, schemaPartes.AREAS_IMPLICADAS, stringifyListValue(normalizadas.areas));
+  }
+  return ok({ repaired: true }, 'Modelo de datos reparado y normalizado.');
 }

@@ -6,17 +6,13 @@
 // ── Mapper fila → objeto ───────────────────────────────────────────────────
 
 function getIncidenciasSchema() {
-  var raw = getAllRaw(CONFIG.SHEETS.INCIDENCIAS);
-  var headers = (raw && raw.length) ? raw[0] : [];
-  var map = {};
-  headers.forEach(function(h, i) {
-    var key = (h || '').toString().toLowerCase().replace(/[\s_]+/g, '');
-    map[key] = i;
-  });
+  var headers = getHeaders(CONFIG.SHEETS.INCIDENCIAS);
+  var map = buildHeaderMap(headers);
 
   var findIdx = function(posibles, fallback) {
     for (var i = 0; i < posibles.length; i++) {
-      if (map[posibles[i]] !== undefined) return map[posibles[i]];
+      var key = normalizeHeaderKey(posibles[i]);
+      if (map[key] !== undefined) return map[key];
     }
     return fallback;
   };
@@ -111,6 +107,9 @@ function createIncidencia(token, data) {
 
     var id  = generateId('INC');
     var now = new Date();
+    var tipoEntrada = validateFromCatalogOrFallback('TipoEntrada', data.tipoEntrada);
+    var prioridad = validateFromCatalogOrFallback('Prioridad', data.prioridad || 'media', 'media');
+    var estado = validateFromCatalogOrFallback('EstadoIncidencia', data.estado || CONFIG.ESTADOS_INCIDENCIA.ABIERTA, CONFIG.ESTADOS_INCIDENCIA.ABIERTA);
 
     var schemaInc = getIncidenciasSchema();
     var row = [];
@@ -118,18 +117,18 @@ function createIncidencia(token, data) {
     row[schemaInc.ID_PARTE] = idParte;
     row[schemaInc.FECHA_EVENTO] = data.fechaEvento ? new Date(data.fechaEvento) : now;
     row[schemaInc.AREA] = areaValidada;
-    row[schemaInc.TIPO_ENTRADA] = data.tipoEntrada;
+    row[schemaInc.TIPO_ENTRADA] = tipoEntrada;
     row[schemaInc.DESCRIPCION] = data.descripcion;
     row[schemaInc.ACTUACION] = data.actuacion || '';
     row[schemaInc.MEDICAMENTOS] = data.medicamentos || '';
     row[schemaInc.SERVICIO] = data.servicio || '';
-    row[schemaInc.PRIORIDAD] = data.prioridad || 'media';
+    row[schemaInc.PRIORIDAD] = prioridad;
     row[schemaInc.ETIQUETAS] = data.etiquetas || '';
     row[schemaInc.REGISTRADO_POR] = user.email;
     row[schemaInc.FECHA_REGISTRO] = now;
     row[schemaInc.FECHA_MODIFICACION] = now;
     row[schemaInc.MODIFICADO_POR] = user.email;
-    row[schemaInc.ESTADO] = data.estado || CONFIG.ESTADOS_INCIDENCIA.ABIERTA;
+    row[schemaInc.ESTADO] = estado;
     row[schemaInc.SEGUIMIENTO] = data.seguimiento || '';
     row[schemaInc.TIENE_ADJUNTOS] = false;
     appendRow(CONFIG.SHEETS.INCIDENCIAS, row);
@@ -186,22 +185,23 @@ function listIncidenciasByParte(parteId) {
 function updateIncidencia(token, id, data) {
   try {
     var user   = requireEditPermission(token);
-    var result = findRow(CONFIG.SHEETS.INCIDENCIAS, COLS.INCIDENCIAS.ID, id);
+    var schema = getIncidenciasSchema();
+    var result = findRow(CONFIG.SHEETS.INCIDENCIAS, schema.ID, normalizeIdKey(id));
     if (!result) throw new Error('Incidencia no encontrada.');
 
     var row    = result.row.slice();
     var campos = {
-      fechaEvento:  COLS.INCIDENCIAS.FECHA_EVENTO,
-      area:         COLS.INCIDENCIAS.AREA,
-      tipoEntrada:  COLS.INCIDENCIAS.TIPO_ENTRADA,
-      descripcion:  COLS.INCIDENCIAS.DESCRIPCION,
-      actuacion:    COLS.INCIDENCIAS.ACTUACION,
-      medicamentos: COLS.INCIDENCIAS.MEDICAMENTOS,
-      servicio:     COLS.INCIDENCIAS.SERVICIO,
-      prioridad:    COLS.INCIDENCIAS.PRIORIDAD,
-      etiquetas:    COLS.INCIDENCIAS.ETIQUETAS,
-      estado:       COLS.INCIDENCIAS.ESTADO,
-      seguimiento:  COLS.INCIDENCIAS.SEGUIMIENTO
+      fechaEvento:  schema.FECHA_EVENTO,
+      area:         schema.AREA,
+      tipoEntrada:  schema.TIPO_ENTRADA,
+      descripcion:  schema.DESCRIPCION,
+      actuacion:    schema.ACTUACION,
+      medicamentos: schema.MEDICAMENTOS,
+      servicio:     schema.SERVICIO,
+      prioridad:    schema.PRIORIDAD,
+      etiquetas:    schema.ETIQUETAS,
+      estado:       schema.ESTADO,
+      seguimiento:  schema.SEGUIMIENTO
     };
 
     Object.keys(campos).forEach(function(key) {
@@ -216,8 +216,8 @@ function updateIncidencia(token, id, data) {
       }
     });
 
-    row[COLS.INCIDENCIAS.FECHA_MODIFICACION] = new Date();
-    row[COLS.INCIDENCIAS.MODIFICADO_POR]     = user.email;
+    row[schema.FECHA_MODIFICACION] = new Date();
+    row[schema.MODIFICADO_POR]     = user.email;
 
     updateRow(CONFIG.SHEETS.INCIDENCIAS, result.rowIndex, row);
 
@@ -239,9 +239,10 @@ function updateEstadoIncidencia(token, id, nuevoEstado) {
 
 /** Interno: marca tieneAdjuntos = true. Llamado desde Adjuntos.gs. */
 function marcarConAdjuntos(incidenciaId) {
-  var result = findRow(CONFIG.SHEETS.INCIDENCIAS, COLS.INCIDENCIAS.ID, incidenciaId);
+  var schema = getIncidenciasSchema();
+  var result = findRow(CONFIG.SHEETS.INCIDENCIAS, schema.ID, normalizeIdKey(incidenciaId));
   if (result) {
-    setCellValue(CONFIG.SHEETS.INCIDENCIAS, result.rowIndex, COLS.INCIDENCIAS.TIENE_ADJUNTOS, true);
+    setCellValue(CONFIG.SHEETS.INCIDENCIAS, result.rowIndex, schema.TIENE_ADJUNTOS, true);
   }
 }
 
@@ -254,14 +255,17 @@ function marcarConAdjuntos(incidenciaId) {
 function deleteIncidencia(token, id) {
   try {
     requireAdminPermission(token);
-    var result = findRow(CONFIG.SHEETS.INCIDENCIAS, COLS.INCIDENCIAS.ID, id);
+    var schema = getIncidenciasSchema();
+    var schemaAdj = getAdjuntosSchema();
+    var result = findRow(CONFIG.SHEETS.INCIDENCIAS, schema.ID, normalizeIdKey(id));
     if (!result) throw new Error('Incidencia no encontrada.');
 
     // Eliminar adjuntos en Drive y en la hoja (recorrido inverso para evitar desplazamiento de filas)
     var adjData = getAllRaw(CONFIG.SHEETS.ADJUNTOS);
     for (var i = adjData.length - 1; i >= 1; i--) {
-      if (adjData[i][COLS.ADJUNTOS.ID_INCIDENCIA] === id && adjData[i][COLS.ADJUNTOS.ID]) {
-        try { DriveApp.getFileById(adjData[i][COLS.ADJUNTOS.ID_DRIVE]).setTrashed(true); } catch (e) {}
+      if (normalizeIdKey(rowVal(adjData[i], schemaAdj.ID_INCIDENCIA)) === normalizeIdKey(id) &&
+          rowVal(adjData[i], schemaAdj.ID)) {
+        try { DriveApp.getFileById(rowVal(adjData[i], schemaAdj.ID_DRIVE)).setTrashed(true); } catch (e) {}
         deleteRowByIndex(CONFIG.SHEETS.ADJUNTOS, i + 1);
       }
     }

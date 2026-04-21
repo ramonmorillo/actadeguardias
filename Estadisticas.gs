@@ -8,6 +8,8 @@
  */
 function getEstadisticas(params) {
   try {
+    var schemaInc = getIncidenciasSchema();
+    var schemaPartes = getPartesSchema();
     params = params || {};
     var desde = params.fechaDesde ? new Date(params.fechaDesde) : null;
     var hasta = params.fechaHasta ? new Date(params.fechaHasta) : null;
@@ -26,19 +28,19 @@ function getEstadisticas(params) {
 
     for (var i = 1; i < data.length; i++) {
       var row = data[i];
-      if (!row[COLS.INCIDENCIAS.ID]) continue;
+      if (!rowVal(row, schemaInc.ID)) continue;
 
-      var fe = new Date(row[COLS.INCIDENCIAS.FECHA_EVENTO]);
+      var fe = new Date(rowVal(row, schemaInc.FECHA_EVENTO));
       if (desde && fe < desde) continue;
       if (hasta && fe > hasta) continue;
 
       total++;
 
-      var area = row[COLS.INCIDENCIAS.AREA]        || 'Sin área';
-      var tipo = row[COLS.INCIDENCIAS.TIPO_ENTRADA] || 'Sin tipo';
-      var prio = row[COLS.INCIDENCIAS.PRIORIDAD]    || 'Sin prioridad';
-      var est  = row[COLS.INCIDENCIAS.ESTADO]       || 'Sin estado';
-      var prof = row[COLS.INCIDENCIAS.REGISTRADO_POR]|| 'Desconocido';
+      var area = rowVal(row, schemaInc.AREA)          || 'Sin área';
+      var tipo = rowVal(row, schemaInc.TIPO_ENTRADA)  || 'Sin tipo';
+      var prio = rowVal(row, schemaInc.PRIORIDAD)     || 'Sin prioridad';
+      var est  = rowVal(row, schemaInc.ESTADO)        || 'Sin estado';
+      var prof = rowVal(row, schemaInc.REGISTRADO_POR)|| 'Desconocido';
 
       porArea[area]        = (porArea[area]        || 0) + 1;
       porTipo[tipo]        = (porTipo[tipo]        || 0) + 1;
@@ -51,7 +53,7 @@ function getEstadisticas(params) {
       if (prio === 'crítica')  criticas++;
 
       // Medicamentos (separados por coma)
-      var meds = (row[COLS.INCIDENCIAS.MEDICAMENTOS] || '').split(',');
+      var meds = (rowVal(row, schemaInc.MEDICAMENTOS) || '').split(',');
       meds.forEach(function(m) {
         m = m.trim();
         if (m) medicamentos[m] = (medicamentos[m] || 0) + 1;
@@ -77,8 +79,8 @@ function getEstadisticas(params) {
     var partesData = getAllRaw(CONFIG.SHEETS.PARTES);
     var totalPartes = 0;
     for (var p = 1; p < partesData.length; p++) {
-      if (!partesData[p][COLS.PARTES.ID]) continue;
-      var fp = new Date(partesData[p][COLS.PARTES.FECHA_INICIO]);
+      if (!rowVal(partesData[p], schemaPartes.ID)) continue;
+      var fp = new Date(rowVal(partesData[p], schemaPartes.FECHA_INICIO));
       if (desde && fp < desde) continue;
       if (hasta && fp > hasta) continue;
       totalPartes++;

@@ -13,6 +13,8 @@
  */
 function searchIncidencias(filtros) {
   try {
+    var schemaInc = getIncidenciasSchema();
+    var schemaPartes = getPartesSchema();
     filtros = filtros || {};
     var data = getAllRaw(CONFIG.SHEETS.INCIDENCIAS);
     if (data.length <= 1) return ok({ total: 0, totalPaginas: 0, pagina: 1, resultados: [] });
@@ -23,12 +25,12 @@ function searchIncidencias(filtros) {
       var partesData = getAllRaw(CONFIG.SHEETS.PARTES);
       for (var p = 1; p < partesData.length; p++) {
         var pRow = partesData[p];
-        if (pRow[COLS.PARTES.ID]) {
+        if (rowVal(pRow, schemaPartes.ID)) {
           var normalizadas = normalizarSeparacionProfesionalesYAreas(
-            pRow[COLS.PARTES.PROFESIONALES],
-            pRow[COLS.PARTES.AREAS_IMPLICADAS]
+            rowVal(pRow, schemaPartes.PROFESIONALES),
+            rowVal(pRow, schemaPartes.AREAS_IMPLICADAS)
           );
-          partesMap[pRow[COLS.PARTES.ID]] = normalizadas.profesionales.map(function(v) {
+          partesMap[normalizeIdKey(rowVal(pRow, schemaPartes.ID))] = normalizadas.profesionales.map(function(v) {
             return v.toLowerCase();
           });
         }
@@ -38,9 +40,9 @@ function searchIncidencias(filtros) {
     var resultados = [];
     for (var i = 1; i < data.length; i++) {
       var row = data[i];
-      if (!row[COLS.INCIDENCIAS.ID]) continue;
-      if (matchesFiltros(row, filtros, partesMap)) {
-        resultados.push(rowToIncidencia(row));
+      if (!rowVal(row, schemaInc.ID)) continue;
+      if (matchesFiltros(row, filtros, partesMap, schemaInc)) {
+        resultados.push(rowToIncidencia(row, schemaInc));
       }
     }
 
@@ -69,24 +71,24 @@ function searchIncidencias(filtros) {
   }
 }
 
-function matchesFiltros(row, f, partesMap) {
+function matchesFiltros(row, f, partesMap, schemaInc) {
   // Texto libre: busca en descripcion, actuacion, medicamentos, servicio, etiquetas
   if (f.texto) {
     var txt = f.texto.toLowerCase();
     var haystack = [
-      row[COLS.INCIDENCIAS.DESCRIPCION],
-      row[COLS.INCIDENCIAS.ACTUACION],
-      row[COLS.INCIDENCIAS.MEDICAMENTOS],
-      row[COLS.INCIDENCIAS.SERVICIO],
-      row[COLS.INCIDENCIAS.ETIQUETAS],
-      row[COLS.INCIDENCIAS.SEGUIMIENTO]
+      rowVal(row, schemaInc.DESCRIPCION),
+      rowVal(row, schemaInc.ACTUACION),
+      rowVal(row, schemaInc.MEDICAMENTOS),
+      rowVal(row, schemaInc.SERVICIO),
+      rowVal(row, schemaInc.ETIQUETAS),
+      rowVal(row, schemaInc.SEGUIMIENTO)
     ].join(' ').toLowerCase();
     if (haystack.indexOf(txt) === -1) return false;
   }
 
   // Rango de fechas (sobre fechaEvento)
   if (f.fechaDesde || f.fechaHasta) {
-    var fe = new Date(row[COLS.INCIDENCIAS.FECHA_EVENTO]);
+    var fe = new Date(rowVal(row, schemaInc.FECHA_EVENTO));
     if (f.fechaDesde && fe < new Date(f.fechaDesde)) return false;
     if (f.fechaHasta) {
       var hasta = new Date(f.fechaHasta); hasta.setHours(23, 59, 59, 999);
@@ -95,35 +97,35 @@ function matchesFiltros(row, f, partesMap) {
   }
 
   // Filtros exactos
-  if (f.idParte     && row[COLS.INCIDENCIAS.ID_PARTE]    !== f.idParte)     return false;
-  if (f.area        && row[COLS.INCIDENCIAS.AREA]         !== f.area)        return false;
-  if (f.tipoEntrada && row[COLS.INCIDENCIAS.TIPO_ENTRADA] !== f.tipoEntrada) return false;
-  if (f.prioridad   && row[COLS.INCIDENCIAS.PRIORIDAD]    !== f.prioridad)   return false;
-  if (f.estado      && row[COLS.INCIDENCIAS.ESTADO]       !== f.estado)      return false;
-  if (f.registradoPor && row[COLS.INCIDENCIAS.REGISTRADO_POR] !== f.registradoPor) return false;
+  if (f.idParte     && rowVal(row, schemaInc.ID_PARTE)       !== f.idParte)       return false;
+  if (f.area        && rowVal(row, schemaInc.AREA)           !== f.area)          return false;
+  if (f.tipoEntrada && rowVal(row, schemaInc.TIPO_ENTRADA)   !== f.tipoEntrada)   return false;
+  if (f.prioridad   && rowVal(row, schemaInc.PRIORIDAD)      !== f.prioridad)     return false;
+  if (f.estado      && rowVal(row, schemaInc.ESTADO)         !== f.estado)        return false;
+  if (f.registradoPor && rowVal(row, schemaInc.REGISTRADO_POR) !== f.registradoPor) return false;
 
   // Filtros parciales
   if (f.medicamento) {
-    var med = (row[COLS.INCIDENCIAS.MEDICAMENTOS] || '').toLowerCase();
+    var med = (rowVal(row, schemaInc.MEDICAMENTOS) || '').toLowerCase();
     if (med.indexOf(f.medicamento.toLowerCase()) === -1) return false;
   }
   if (f.servicio) {
-    var srv = (row[COLS.INCIDENCIAS.SERVICIO] || '').toLowerCase();
+    var srv = (rowVal(row, schemaInc.SERVICIO) || '').toLowerCase();
     if (srv.indexOf(f.servicio.toLowerCase()) === -1) return false;
   }
 
   // Filtro por profesional de guardia del parte
   if (f.profesionalGuardia) {
-    var profs = partesMap[row[COLS.INCIDENCIAS.ID_PARTE]] || [];
+    var profs = partesMap[normalizeIdKey(rowVal(row, schemaInc.ID_PARTE))] || [];
     var q = f.profesionalGuardia.toLowerCase();
     var found = profs.some(function(p) { return p.indexOf(q) !== -1; });
     if (!found) return false;
   }
 
   // Tiene adjuntos
-  if (f.conAdjuntos   === true && !row[COLS.INCIDENCIAS.TIENE_ADJUNTOS]) return false;
+  if (f.conAdjuntos   === true && !rowVal(row, schemaInc.TIENE_ADJUNTOS)) return false;
   // Tiene texto de seguimiento pendiente
-  if (f.conSeguimiento === true && !row[COLS.INCIDENCIAS.SEGUIMIENTO])   return false;
+  if (f.conSeguimiento === true && !rowVal(row, schemaInc.SEGUIMIENTO))   return false;
 
   return true;
 }
@@ -131,17 +133,18 @@ function matchesFiltros(row, f, partesMap) {
 /** Devuelve lista de IDs de partes para poblar el selector del buscador. */
 function getPartesParaSelector() {
   try {
+    var schemaPartes = getPartesSchema();
     var data = getAllRaw(CONFIG.SHEETS.PARTES);
     if (data.length <= 1) return ok([]);
     var list = data.slice(1)
-      .filter(function(r) { return !!r[COLS.PARTES.ID]; })
+      .filter(function(r) { return !!rowVal(r, schemaPartes.ID); })
       .map(function(r) {
         return {
-          id:    r[COLS.PARTES.ID],
-          label: r[COLS.PARTES.ID] + ' · ' +
-                 formatDateShort(r[COLS.PARTES.FECHA_INICIO]) + ' – ' +
-                 formatDateShort(r[COLS.PARTES.FECHA_FIN]) +
-                 ' [' + r[COLS.PARTES.TIPO_PERIODO] + ']'
+          id:    rowVal(r, schemaPartes.ID),
+          label: rowVal(r, schemaPartes.ID) + ' · ' +
+                 formatDateShort(rowVal(r, schemaPartes.FECHA_INICIO)) + ' – ' +
+                 formatDateShort(rowVal(r, schemaPartes.FECHA_FIN)) +
+                 ' [' + rowVal(r, schemaPartes.TIPO_PERIODO) + ']'
         };
       });
     list.sort(function(a, b) { return b.id.localeCompare(a.id); });

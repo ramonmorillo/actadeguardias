@@ -10,11 +10,15 @@
 
 function getUserRole(email) {
   if (!email) return null;
-  var result = findRow(CONFIG.SHEETS.USUARIOS, COLS.USUARIOS.EMAIL, email);
-  if (!result) return null;
-  var row = result.row;
-  if (!row[COLS.USUARIOS.ACTIVO]) return null;
-  return row[COLS.USUARIOS.ROL];
+  var schemaUsers = getUsuariosSchema();
+  var data = getAllRaw(CONFIG.SHEETS.USUARIOS);
+  var key = normalizeIdKey(email).toLowerCase();
+  for (var i = 1; i < data.length; i++) {
+    if (normalizeIdKey(rowVal(data[i], schemaUsers.EMAIL)).toLowerCase() !== key) continue;
+    if (!rowVal(data[i], schemaUsers.ACTIVO)) return null;
+    return rowVal(data[i], schemaUsers.ROL);
+  }
+  return null;
 }
 
 function isAdmin(email) {
@@ -59,17 +63,18 @@ function requireAdminPermission(token) {
 function getUsuarios(token) {
   try {
     if (!getSessionUser(token)) return fail('Sesión no válida.');
+    var schemaUsers = getUsuariosSchema();
     var data = getAllRaw(CONFIG.SHEETS.USUARIOS);
     if (data.length <= 1) return ok([]);
     var usuarios = data.slice(1)
-      .filter(function(row) { return !!row[COLS.USUARIOS.EMAIL]; })
+      .filter(function(row) { return !!rowVal(row, schemaUsers.EMAIL); })
       .map(function(row) {
         return {
-          email:     row[COLS.USUARIOS.EMAIL],
-          nombre:    row[COLS.USUARIOS.NOMBRE],
-          rol:       row[COLS.USUARIOS.ROL],
-          activo:    row[COLS.USUARIOS.ACTIVO],
-          fechaAlta: toISO(row[COLS.USUARIOS.FECHA_ALTA])
+          email:     rowVal(row, schemaUsers.EMAIL),
+          nombre:    rowVal(row, schemaUsers.NOMBRE),
+          rol:       rowVal(row, schemaUsers.ROL),
+          activo:    rowVal(row, schemaUsers.ACTIVO),
+          fechaAlta: toISO(rowVal(row, schemaUsers.FECHA_ALTA))
           // Password nunca se devuelve al cliente
         };
       });
@@ -83,10 +88,11 @@ function getUsuarios(token) {
 function addUsuario(token, email, nombre, rol, password) {
   try {
     requireAdminPermission(token);
+    var schemaUsers = getUsuariosSchema();
     if (!email || !nombre || !rol) throw new Error('Email, nombre y rol son obligatorios.');
     if (!password || password.trim().length < 4) throw new Error('La contraseña debe tener al menos 4 caracteres.');
     email = email.trim().toLowerCase();
-    if (findRow(CONFIG.SHEETS.USUARIOS, COLS.USUARIOS.EMAIL, email)) {
+    if (findRow(CONFIG.SHEETS.USUARIOS, schemaUsers.EMAIL, email)) {
       throw new Error('Ya existe un usuario con ese email.');
     }
     appendRow(CONFIG.SHEETS.USUARIOS, [email, nombre, rol, true, password.trim(), new Date()]);
@@ -100,10 +106,11 @@ function addUsuario(token, email, nombre, rol, password) {
 function updateUsuarioRol(token, email, nuevoRol) {
   try {
     requireAdminPermission(token);
+    var schemaUsers = getUsuariosSchema();
     email = (email || '').trim().toLowerCase();
-    var result = findRow(CONFIG.SHEETS.USUARIOS, COLS.USUARIOS.EMAIL, email);
+    var result = findRow(CONFIG.SHEETS.USUARIOS, schemaUsers.EMAIL, email);
     if (!result) throw new Error('Usuario no encontrado.');
-    setCellValue(CONFIG.SHEETS.USUARIOS, result.rowIndex, COLS.USUARIOS.ROL, nuevoRol);
+    setCellValue(CONFIG.SHEETS.USUARIOS, result.rowIndex, schemaUsers.ROL, nuevoRol);
     return ok(null, 'Rol actualizado.');
   } catch (e) {
     logErr('updateUsuarioRol', e);
@@ -114,11 +121,12 @@ function updateUsuarioRol(token, email, nuevoRol) {
 function toggleUsuarioActivo(token, email) {
   try {
     requireAdminPermission(token);
+    var schemaUsers = getUsuariosSchema();
     email = (email || '').trim().toLowerCase();
-    var result = findRow(CONFIG.SHEETS.USUARIOS, COLS.USUARIOS.EMAIL, email);
+    var result = findRow(CONFIG.SHEETS.USUARIOS, schemaUsers.EMAIL, email);
     if (!result) throw new Error('Usuario no encontrado.');
-    var current = result.row[COLS.USUARIOS.ACTIVO];
-    setCellValue(CONFIG.SHEETS.USUARIOS, result.rowIndex, COLS.USUARIOS.ACTIVO, !current);
+    var current = rowVal(result.row, schemaUsers.ACTIVO);
+    setCellValue(CONFIG.SHEETS.USUARIOS, result.rowIndex, schemaUsers.ACTIVO, !current);
     return ok(null, current ? 'Usuario desactivado.' : 'Usuario activado.');
   } catch (e) {
     logErr('toggleUsuarioActivo', e);
