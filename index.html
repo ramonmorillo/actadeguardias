@@ -966,6 +966,10 @@
           </div>
           <div class="col-md-6">
             <label class="form-label">Profesionales de guardia</label>
+            <div class="d-flex justify-content-end gap-2 mb-1">
+              <button type="button" class="btn btn-link btn-sm p-0" onclick="seleccionarTodosProfesionalesGuardia()">Seleccionar todos</button>
+              <button type="button" class="btn btn-link btn-sm p-0" onclick="limpiarProfesionalesGuardia()">Limpiar</button>
+            </div>
             <div id="mp-prof-list"></div>
             <div id="mp-prof-chip-list" class="chip-list"></div>
             <input type="hidden" id="mp-profesionales">
@@ -973,6 +977,10 @@
           </div>
           <div class="col-md-6">
             <label class="form-label">Áreas implicadas en el parte</label>
+            <div class="d-flex justify-content-end gap-2 mb-1">
+              <button type="button" class="btn btn-link btn-sm p-0" onclick="seleccionarTodasAreasImplicadasParte()">Seleccionar todas</button>
+              <button type="button" class="btn btn-link btn-sm p-0" onclick="limpiarAreasImplicadasParte()">Limpiar</button>
+            </div>
             <div id="mp-area-list"></div>
             <div id="mp-area-chip-list" class="chip-list"></div>
             <input type="hidden" id="mp-areas-implicadas">
@@ -1418,6 +1426,16 @@ function toggleProfesionalGuardiaByIndex(index, checked) {
   toggleProfesionalGuardia(nombre, checked);
 }
 
+function seleccionarTodosProfesionalesGuardia() {
+  setSelectedProfesionalesGuardia((APP.catalogProfesionales || []).slice());
+  renderProfesionalesGuardiaSelector(APP.catalogProfesionales || []);
+}
+
+function limpiarProfesionalesGuardia() {
+  setSelectedProfesionalesGuardia([]);
+  renderProfesionalesGuardiaSelector(APP.catalogProfesionales || []);
+}
+
 function renderProfesionalesGuardiaSelector(opciones) {
   var cont = document.getElementById('mp-prof-list');
   if (!cont) return;
@@ -1469,6 +1487,16 @@ function toggleAreaImplicadaParteByIndex(index, checked) {
   var nombre = APP.catalogAreasParte[index];
   if (!nombre) return;
   toggleAreaImplicadaParte(nombre, checked);
+}
+
+function seleccionarTodasAreasImplicadasParte() {
+  setSelectedAreasImplicadasParte((APP.catalogAreasParte || []).slice());
+  renderAreasImplicadasParteSelector(APP.catalogAreasParte || []);
+}
+
+function limpiarAreasImplicadasParte() {
+  setSelectedAreasImplicadasParte([]);
+  renderAreasImplicadasParteSelector(APP.catalogAreasParte || []);
 }
 
 function renderAreasImplicadasParteSelector(opciones) {
@@ -2063,6 +2091,7 @@ function abrirModalParte(id) {
   document.getElementById('mp-tipo').value   = '';
   document.getElementById('mp-estado').value = 'borrador';
   document.getElementById('modalParteLbl').textContent = id ? 'Editar parte' : 'Nuevo parte de guardia';
+  refrescarCatalogosModalParte();
 
   if (id) {
     llamar('getParte', [id], 'Cargando parte…', function(p) {
@@ -2098,6 +2127,19 @@ function abrirModalParte(id) {
     document.getElementById('mp-inicio').value = toLocal(ahora);
     APP.modalParteInst.show();
   }
+}
+
+function refrescarCatalogosModalParte() {
+  google.script.run
+    .withSuccessHandler(function(result) {
+      if (!result || !result.success) return;
+      APP.catalogos = result.data || {};
+      poblarSelectoresCatalogos();
+      renderProfesionalesGuardiaSelector((APP.catalogos && APP.catalogos.ProfesionalGuardia) || []);
+      renderAreasImplicadasParteSelector((APP.catalogos && APP.catalogos.Area) || []);
+    })
+    .withFailureHandler(function() {})
+    .getCatalogos();
 }
 
 function guardarParte() {
