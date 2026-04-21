@@ -375,7 +375,13 @@
               <option value="">Todos</option>
             </select>
           </div>
-          <div class="col-sm-3">
+          <div class="col-sm-2">
+            <label class="form-label mb-1" style="font-size:.8rem;">Área implicada</label>
+            <select class="form-select form-select-sm" id="hist-filtro-area" onchange="filtrarHistorico()">
+              <option value="">Todas</option>
+            </select>
+          </div>
+          <div class="col-sm-2">
             <label class="form-label mb-1" style="font-size:.8rem;">Estado</label>
             <select class="form-select form-select-sm" id="hist-filtro-estado" onchange="filtrarHistorico()">
               <option value="">Todos</option>
@@ -398,12 +404,12 @@
           <thead>
             <tr>
               <th>ID</th><th>Fecha inicio</th><th>Fecha fin</th>
-              <th>Tipo</th><th>Profesionales</th><th>Incidencias</th>
+              <th>Tipo</th><th>Profesionales</th><th>Áreas implicadas</th><th>Incidencias</th>
               <th>Estado</th><th>Creado por</th><th class="text-end">Acciones</th>
             </tr>
           </thead>
           <tbody id="hist-body">
-            <tr><td colspan="9" class="text-center text-muted py-3">Cargando…</td></tr>
+            <tr><td colspan="10" class="text-center text-muted py-3">Cargando…</td></tr>
           </tbody>
         </table>
       </div>
@@ -461,6 +467,10 @@
           <div class="col-sm-4">
             <div class="text-muted small mb-1">Profesionales de guardia</div>
             <div id="parte-profesionales">—</div>
+          </div>
+          <div class="col-sm-4">
+            <div class="text-muted small mb-1">Áreas implicadas</div>
+            <div id="parte-areas-implicadas">—</div>
           </div>
           <div class="col-12">
             <div class="text-muted small mb-1">Observaciones generales</div>
@@ -962,6 +972,13 @@
             <div class="form-text">Selecciona uno o varios profesionales del catálogo.</div>
           </div>
           <div class="col-12">
+            <label class="form-label">Áreas implicadas en el parte</label>
+            <div id="mp-area-list"></div>
+            <div id="mp-area-chip-list" class="chip-list"></div>
+            <input type="hidden" id="mp-areas-implicadas">
+            <div class="form-text">Selecciona una o varias áreas del catálogo (tipo: Area).</div>
+          </div>
+          <div class="col-12">
             <label class="form-label">Observaciones generales del parte</label>
             <textarea class="form-control" id="mp-observaciones" rows="3"
                       placeholder="Resumen general del periodo, contexto, etc."></textarea>
@@ -1246,6 +1263,7 @@ var APP = {
   charts:          {},
   histAllPartes:   [],
   catalogProfesionales: [],
+  catalogAreasParte: [],
   modalParteInst:   null,
   modalIncInst:     null,
   modalConfirmInst: null,
@@ -1422,6 +1440,59 @@ function renderProfesionalesGuardiaSelector(opciones) {
   setSelectedProfesionalesGuardia(selected);
 }
 
+function getSelectedAreasImplicadasParte() {
+  var raw = document.getElementById('mp-areas-implicadas').value || '[]';
+  try {
+    var arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr : [];
+  } catch (e) { return []; }
+}
+
+function setSelectedAreasImplicadasParte(list) {
+  var clean = (list || []).filter(function(v) { return !!v; });
+  document.getElementById('mp-areas-implicadas').value = JSON.stringify(clean);
+  var chipCont = document.getElementById('mp-area-chip-list');
+  chipCont.innerHTML = clean.map(function(nombre) {
+    return '<span class="chip-item"><i class="bi bi-diagram-3"></i>' + escHtml(nombre) + '</span>';
+  }).join('');
+}
+
+function toggleAreaImplicadaParte(nombre, checked) {
+  var current = getSelectedAreasImplicadasParte();
+  var idx = current.indexOf(nombre);
+  if (checked && idx === -1) current.push(nombre);
+  if (!checked && idx !== -1) current.splice(idx, 1);
+  setSelectedAreasImplicadasParte(current);
+}
+
+function toggleAreaImplicadaParteByIndex(index, checked) {
+  var nombre = APP.catalogAreasParte[index];
+  if (!nombre) return;
+  toggleAreaImplicadaParte(nombre, checked);
+}
+
+function renderAreasImplicadasParteSelector(opciones) {
+  var cont = document.getElementById('mp-area-list');
+  if (!cont) return;
+  APP.catalogAreasParte = (opciones || []).slice();
+  if (!opciones || !opciones.length) {
+    cont.innerHTML = '<div class="text-muted small">No hay áreas en catálogo (tipo: Area).</div>';
+    setSelectedAreasImplicadasParte([]);
+    return;
+  }
+  var selected = getSelectedAreasImplicadasParte();
+  cont.innerHTML = opciones.map(function(nombre, i) {
+    var id = 'mp-area-opt-' + i;
+    var checked = selected.indexOf(nombre) !== -1 ? ' checked' : '';
+    return '<div class="form-check">' +
+      '<input class="form-check-input" type="checkbox" id="' + id + '"' + checked +
+      ' onchange="toggleAreaImplicadaParteByIndex(' + i + ', this.checked)">' +
+      '<label class="form-check-label small" for="' + id + '">' + escHtml(nombre) + '</label>' +
+      '</div>';
+  }).join('');
+  setSelectedAreasImplicadasParte(selected);
+}
+
 // ══════════════════════════════════════════════════════
 //  LLAMADAS AL SERVIDOR (wrapper con spinner)
 // ══════════════════════════════════════════════════════
@@ -1568,6 +1639,7 @@ function poblarSelectoresCatalogos() {
   llenarSelect('mp-tipo', tper);
   llenarSelect('mp-estado', eParte, 'borrador');
   renderProfesionalesGuardiaSelector(profs);
+  renderAreasImplicadasParteSelector(areas);
   // Modal incidencia
   llenarSelect('mi-area', areas);
   llenarSelect('mi-tipo', tipos);
@@ -1583,6 +1655,7 @@ function poblarSelectoresCatalogos() {
   llenarSelect('inf-tipo', tipos);
   // Histórico
   llenarSelect('hist-filtro-tipo', tper);
+  llenarSelect('hist-filtro-area', areas);
   // Filtros vista parte
   llenarSelect('inc-filtro-area', areas);
 }
@@ -1719,13 +1792,18 @@ function cargarHistorico() {
 function filtrarHistorico() {
   var texto  = (document.getElementById('hist-filtro-texto').value  || '').toLowerCase();
   var tipo   =  document.getElementById('hist-filtro-tipo').value   || '';
+  var area   =  document.getElementById('hist-filtro-area').value   || '';
   var estado =  document.getElementById('hist-filtro-estado').value || '';
 
   var filtrados = APP.histAllPartes.filter(function(p) {
     if (tipo   && p.tipoPeriodo !== tipo)   return false;
     if (estado && p.estado      !== estado) return false;
+    if (area) {
+      var areasList = p.areasImplicadasLista || [];
+      if (areasList.indexOf(area) === -1) return false;
+    }
     if (texto) {
-      var haystack = [p.id, p.profesionales, p.creadoPor, p.observaciones].join(' ').toLowerCase();
+      var haystack = [p.id, p.profesionales, p.areasImplicadas, p.creadoPor, p.observaciones].join(' ').toLowerCase();
       if (haystack.indexOf(texto) === -1) return false;
     }
     return true;
@@ -1735,7 +1813,7 @@ function filtrarHistorico() {
   document.getElementById('hist-count').textContent = filtrados.length + ' partes';
 
   if (!filtrados.length) {
-    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3">Sin resultados con los filtros actuales.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-3">Sin resultados con los filtros actuales.</td></tr>';
     return;
   }
 
@@ -1750,6 +1828,7 @@ function filtrarHistorico() {
       '<td class="small">' + fmtDT(p.fechaFin)    + '</td>' +
       '<td class="small">' + (p.tipoPeriodo||'—')  + '</td>' +
       '<td class="small">' + truncar(p.profesionales, 30) + '</td>' +
+      '<td class="small">' + truncar(p.areasImplicadas, 30) + '</td>' +
       '<td class="text-center small">' + (p.numIncidencias !== undefined ? p.numIncidencias : '—') + '</td>' +
       '<td>' + badgeEstado(p.estado) + '</td>' +
       '<td class="small text-muted">' + (p.creadoPor||'—') + '</td>' +
@@ -1767,6 +1846,7 @@ function filtrarHistorico() {
 function limpiarFiltrosHistorico() {
   document.getElementById('hist-filtro-texto').value  = '';
   document.getElementById('hist-filtro-tipo').value   = '';
+  document.getElementById('hist-filtro-area').value   = '';
   document.getElementById('hist-filtro-estado').value = '';
   filtrarHistorico();
 }
@@ -1787,6 +1867,7 @@ function abrirParte(id) {
     document.getElementById('parte-tipo').textContent      = p.tipoPeriodo || '—';
     document.getElementById('parte-estado').innerHTML      = badgeEstado(p.estado);
     document.getElementById('parte-profesionales').textContent = p.profesionales || '(no indicados)';
+    document.getElementById('parte-areas-implicadas').textContent = p.areasImplicadas || '(no indicadas)';
     document.getElementById('parte-observaciones').textContent = p.observaciones || '(sin observaciones)';
     document.getElementById('parte-meta').textContent =
       (p.creadoPor || '—') + ' · ' + fmtDT(p.fechaCreacion);
@@ -1976,7 +2057,9 @@ function abrirModalParte(id) {
     document.getElementById(fId).value = '';
   });
   setSelectedProfesionalesGuardia([]);
+  setSelectedAreasImplicadasParte([]);
   renderProfesionalesGuardiaSelector((APP.catalogos && APP.catalogos.ProfesionalGuardia) || []);
+  renderAreasImplicadasParteSelector((APP.catalogos && APP.catalogos.Area) || []);
   document.getElementById('mp-tipo').value   = '';
   document.getElementById('mp-estado').value = 'borrador';
   document.getElementById('modalParteLbl').textContent = id ? 'Editar parte' : 'Nuevo parte de guardia';
@@ -1998,7 +2081,9 @@ function abrirModalParte(id) {
       document.getElementById('mp-tipo').value         = p.tipoPeriodo   || '';
       document.getElementById('mp-estado').value       = p.estado        || 'borrador';
       setSelectedProfesionalesGuardia(p.profesionalesLista || []);
+      setSelectedAreasImplicadasParte(p.areasImplicadasLista || []);
       renderProfesionalesGuardiaSelector((APP.catalogos && APP.catalogos.ProfesionalGuardia) || []);
+      renderAreasImplicadasParteSelector((APP.catalogos && APP.catalogos.Area) || []);
       document.getElementById('mp-observaciones').value= p.observaciones || '';
       APP.modalParteInst.show();
     });
@@ -2022,6 +2107,7 @@ function guardarParte() {
   var tipo   = document.getElementById('mp-tipo').value;
   var estado = document.getElementById('mp-estado').value;
   var profs  = getSelectedProfesionalesGuardia();
+  var areasImplicadas = getSelectedAreasImplicadasParte();
   var obs    = document.getElementById('mp-observaciones').value.trim();
 
   if (!inicio) { toast('La fecha de inicio es obligatoria.', 'warning'); return; }
@@ -2032,7 +2118,9 @@ function guardarParte() {
     fechaInicio: new Date(inicio).toISOString(),
     fechaFin:    new Date(fin).toISOString(),
     tipoPeriodo: tipo, estado: estado,
-    profesionalesLista: profs, observaciones: obs
+    profesionalesLista: profs,
+    areasImplicadasLista: areasImplicadas,
+    observaciones: obs
   };
 
   if (id) {
@@ -2405,6 +2493,7 @@ function generarInforme() {
         '</div>' +
         '<div class="row g-2 small mb-2">' +
           '<div class="col-sm-6"><span class="text-muted">Profesionales:</span> ' + escHtml(p.profesionales || 'No indicados') + '</div>' +
+          '<div class="col-sm-6"><span class="text-muted">Áreas implicadas:</span> ' + escHtml(p.areasImplicadas || 'No indicadas') + '</div>' +
           '<div class="col-sm-3"><span class="text-muted">Creado por:</span> ' + (p.creadoPor || '—') + '</div>' +
           '<div class="col-sm-3"><span class="text-muted">Fecha:</span> ' + fmtD(p.fechaCreacion) + '</div>' +
           (p.observaciones

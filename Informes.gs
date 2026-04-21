@@ -19,9 +19,10 @@ function generateInforme(params) {
     if (hasta) hasta.setHours(23, 59, 59, 999);
 
     // ── 1. Partes en el rango (filtrados por FechaInicio) ─────────────────
-    var partesRaw  = getAllRaw(CONFIG.SHEETS.PARTES);
-    var partes     = [];
-    var parteIdSet = {};  // lookup rápido
+    var partesRaw    = getAllRaw(CONFIG.SHEETS.PARTES);
+    var partes       = [];
+    var parteIdSet   = {};  // lookup rápido
+    var porAreaParte = {};
 
     for (var i = 1; i < partesRaw.length; i++) {
       var pr = partesRaw[i];
@@ -32,6 +33,9 @@ function generateInforme(params) {
       var parteObj = rowToParte(pr);
       partes.push(parteObj);
       parteIdSet[parteObj.id] = true;
+      (parteObj.areasImplicadasLista || []).forEach(function(areaParte) {
+        porAreaParte[areaParte] = (porAreaParte[areaParte] || 0) + 1;
+      });
     }
 
     // Ordenar partes cronológicamente (inicio más antiguo primero)
@@ -104,6 +108,7 @@ function generateInforme(params) {
       totalPartes:          partes.length,
       totalIncidencias:     totalIncidencias,
       porArea:              porArea,
+      porAreaParte:         porAreaParte,
       porTipo:              porTipo,
       porPrioridad:         porPrioridad,
       porEstado:            porEstado,
@@ -133,7 +138,7 @@ function exportInformeCSV(params) {
     };
 
     var headers = [
-      'ID_Parte', 'Periodo_Inicio', 'Periodo_Fin', 'Tipo_Periodo', 'Profesionales',
+      'ID_Parte', 'Periodo_Inicio', 'Periodo_Fin', 'Tipo_Periodo', 'Profesionales', 'Areas_Implicadas_Parte',
       'Estado_Parte', 'Creado_Por', 'Observaciones_Parte',
       'ID_Incidencia', 'Fecha_Evento', 'Área', 'Tipo_Entrada',
       'Descripción', 'Actuación', 'Medicamentos', 'Servicio_Ubicación',
@@ -150,6 +155,7 @@ function exportInformeCSV(params) {
         p.fechaFin    ? formatDateTime(new Date(p.fechaFin))    : '',
         p.tipoPeriodo  || '',
         p.profesionales || '',
+        p.areasImplicadas || '',
         p.estado        || '',
         p.creadoPor     || '',
         p.observaciones || ''
@@ -158,7 +164,7 @@ function exportInformeCSV(params) {
       if (item.incidencias.length === 0) {
         // Parte sin incidencias: una fila con campos de incidencia vacíos
         lines.push(parteBase.concat([
-          '(sin incidencias)', '', '', '', '', '', '', '', '', '', ''
+          '(sin incidencias)', '', '', '', '', '', '', '', '', '', '', '', ''
         ]).map(esc).join(','));
       } else {
         item.incidencias.forEach(function(inc) {
@@ -268,6 +274,7 @@ function getParteHTML(parteId) {
         '<div><div class="meta-lbl">Periodo</div>' + fmtDateS(p.fechaInicio) + ' → ' + fmtDateS(p.fechaFin) + '</div>' +
         '<div><div class="meta-lbl">Tipo de periodo</div>' + (p.tipoPeriodo||'—') + '</div>' +
         '<div><div class="meta-lbl">Profesionales de guardia</div>' + (p.profesionales||'No indicados') + '</div>' +
+        '<div><div class="meta-lbl">Áreas implicadas en el parte</div>' + (p.areasImplicadas||'No indicadas') + '</div>' +
         '<div><div class="meta-lbl">Creado por / Fecha</div>' + (p.creadoPor||'—') + ' · ' + fmtDate(p.fechaCreacion) + '</div>' +
         (p.observaciones ? '<div style="grid-column:1/-1"><div class="meta-lbl">Observaciones</div><em>' + p.observaciones + '</em></div>' : '') +
       '</div>' +
@@ -390,6 +397,9 @@ function getInformeHTML(params) {
           '<div style="margin-top:4px;font-size:10px;color:#3c4043">' +
             '<strong>Profesionales:</strong> ' + (p.profesionales || 'No indicados') +
           '</div>' +
+          '<div style="margin-top:4px;font-size:10px;color:#3c4043">' +
+            '<strong>Áreas implicadas:</strong> ' + (p.areasImplicadas || 'No indicadas') +
+          '</div>' +
           (p.observaciones
             ? '<div style="margin-top:4px;font-size:10px;color:#3c4043;font-style:italic">' +
               '<strong>Observaciones:</strong> ' + p.observaciones + '</div>'
@@ -408,6 +418,7 @@ function getInformeHTML(params) {
 
     var resumenHtml = '';
     if (Object.keys(d.porArea).length) resumenHtml += desgloseHTML('Por área', d.porArea);
+    if (Object.keys(d.porAreaParte).length) resumenHtml += desgloseHTML('Partes por áreas implicadas', d.porAreaParte);
     if (Object.keys(d.porTipo).length) resumenHtml += desgloseHTML('Por tipo de entrada', d.porTipo);
 
     var html =

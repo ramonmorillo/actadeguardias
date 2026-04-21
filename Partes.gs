@@ -7,6 +7,7 @@
 
 function rowToParte(row) {
   var profesionalesList = parseListValue(row[COLS.PARTES.PROFESIONALES]);
+  var areasList = parseListValue(row[COLS.PARTES.AREAS_IMPLICADAS]);
   return {
     id:                  row[COLS.PARTES.ID],
     fechaInicio:         toISO(row[COLS.PARTES.FECHA_INICIO]),
@@ -14,6 +15,8 @@ function rowToParte(row) {
     tipoPeriodo:         row[COLS.PARTES.TIPO_PERIODO],
     profesionales:       profesionalesList.join(', '),
     profesionalesLista:  profesionalesList,
+    areasImplicadas:     areasList.join(', '),
+    areasImplicadasLista: areasList,
     creadoPor:           row[COLS.PARTES.CREADO_POR],
     fechaCreacion:       toISO(row[COLS.PARTES.FECHA_CREACION]),
     ultimaModificacion:  toISO(row[COLS.PARTES.ULTIMA_MODIFICACION]),
@@ -21,6 +24,20 @@ function rowToParte(row) {
     estado:              row[COLS.PARTES.ESTADO],
     observaciones:       row[COLS.PARTES.OBSERVACIONES]
   };
+}
+
+function normalizarAreasParte(input) {
+  var areas = uniqueCaseInsensitive(parseListValue(input));
+  var c = getCatalogos();
+  if (c && c.success && c.data && c.data.Area && c.data.Area.length) {
+    var catalogo = c.data.Area;
+    areas.forEach(function(nombre) {
+      if (catalogo.indexOf(nombre) === -1) {
+        throw new Error('Área implicada no válida: ' + nombre);
+      }
+    });
+  }
+  return stringifyListValue(areas);
 }
 
 function validateFromCatalogOrFallback(tipoCatalogo, valor, fallback) {
@@ -65,6 +82,7 @@ function createParte(token, data) {
     var tipoPeriodo = validateFromCatalogOrFallback('TipoPeriodo', data.tipoPeriodo);
     var estado = validateFromCatalogOrFallback('EstadoParte', data.estado || CONFIG.ESTADOS_PARTE.BORRADOR, CONFIG.ESTADOS_PARTE.BORRADOR);
     var profesionales = normalizarProfesionalesParte(data.profesionales || data.profesionalesLista || []);
+    var areasImplicadas = normalizarAreasParte(data.areasImplicadas || data.areasImplicadasLista || []);
 
     var id  = generateId('PG');
     var now = new Date();
@@ -74,6 +92,7 @@ function createParte(token, data) {
       new Date(data.fechaFin),
       tipoPeriodo,
       profesionales,
+      areasImplicadas,
       user.email, now, now, user.email,
       estado,
       data.observaciones || ''
@@ -188,6 +207,11 @@ function updateParte(token, id, data) {
         data.profesionalesLista !== undefined ? data.profesionalesLista : data.profesionales
       );
     }
+    if (data.areasImplicadas !== undefined || data.areasImplicadasLista !== undefined) {
+      row[COLS.PARTES.AREAS_IMPLICADAS] = normalizarAreasParte(
+        data.areasImplicadasLista !== undefined ? data.areasImplicadasLista : data.areasImplicadas
+      );
+    }
     if (data.observaciones!== undefined) row[COLS.PARTES.OBSERVACIONES] = data.observaciones;
     if (data.estado       !== undefined) {
       row[COLS.PARTES.ESTADO] = validateFromCatalogOrFallback('EstadoParte', data.estado);
@@ -230,6 +254,7 @@ function duplicateParte(token, id) {
       fechaFin:      p.data.fechaFin,
       tipoPeriodo:   p.data.tipoPeriodo,
       profesionalesLista: p.data.profesionalesLista,
+      areasImplicadasLista: p.data.areasImplicadasLista,
       observaciones: '[Duplicado de ' + id + '] ' + (p.data.observaciones || '')
     });
   } catch (e) {
