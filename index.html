@@ -115,6 +115,10 @@
     .adj-item a { color: var(--azul); text-decoration: none; font-weight: 500; }
     .adj-item a:hover { text-decoration: underline; }
 
+    .chip-list { display:flex; flex-wrap:wrap; gap:.35rem; margin-top:.4rem; }
+    .chip-item { display:inline-flex; align-items:center; gap:.3rem; padding:.2rem .55rem; border-radius:999px; background:#e8f0fe; color:#174ea6; font-size:.78rem; border:1px solid #d2e3fc; }
+    #mp-prof-list { max-height: 190px; overflow:auto; border:1px solid var(--borde); border-radius:8px; padding:.5rem .65rem; background:#fff; }
+
     /* ── Responsive util ── */
     @media (max-width: 768px) {
       #main-content { padding: .75rem; }
@@ -947,15 +951,15 @@
           <div class="col-sm-6">
             <label class="form-label">Estado</label>
             <select class="form-select" id="mp-estado">
-              <option value="borrador">Borrador</option>
-              <option value="cerrado">Cerrado</option>
+              <option value="">— Selecciona —</option>
             </select>
           </div>
           <div class="col-12">
             <label class="form-label">Profesionales de guardia</label>
-            <input type="text" class="form-control" id="mp-profesionales"
-                   placeholder="Ej: Ana García, Carlos Martínez">
-            <div class="form-text">Separados por comas.</div>
+            <div id="mp-prof-list"></div>
+            <div id="mp-prof-chip-list" class="chip-list"></div>
+            <input type="hidden" id="mp-profesionales">
+            <div class="form-text">Selecciona uno o varios profesionales del catálogo.</div>
           </div>
           <div class="col-12">
             <label class="form-label">Observaciones generales del parte</label>
@@ -1023,19 +1027,13 @@
           <div class="col-sm-3">
             <label class="form-label">Prioridad</label>
             <select class="form-select" id="mi-prioridad">
-              <option value="baja">Baja</option>
-              <option value="media" selected>Media</option>
-              <option value="alta">Alta</option>
-              <option value="crítica">Crítica</option>
+              <option value="">— Selecciona —</option>
             </select>
           </div>
           <div class="col-sm-3">
             <label class="form-label">Estado</label>
             <select class="form-select" id="mi-estado">
-              <option value="abierta">Abierta</option>
-              <option value="resuelta">Resuelta</option>
-              <option value="informativa">Informativa</option>
-              <option value="cerrada">Cerrada</option>
+              <option value="">— Selecciona —</option>
             </select>
           </div>
         </div>
@@ -1247,6 +1245,7 @@ var APP = {
   informeData:     null,
   charts:          {},
   histAllPartes:   [],
+  catalogProfesionales: [],
   modalParteInst:   null,
   modalIncInst:     null,
   modalConfirmInst: null,
@@ -1368,6 +1367,59 @@ function llenarSelect(selectId, opciones, valorActual) {
     if (op === current) opt.selected = true;
     sel.appendChild(opt);
   });
+}
+
+function getSelectedProfesionalesGuardia() {
+  var raw = document.getElementById('mp-profesionales').value || '[]';
+  try {
+    var arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr : [];
+  } catch (e) { return []; }
+}
+
+function setSelectedProfesionalesGuardia(list) {
+  var clean = (list || []).filter(function(v) { return !!v; });
+  document.getElementById('mp-profesionales').value = JSON.stringify(clean);
+  var chipCont = document.getElementById('mp-prof-chip-list');
+  chipCont.innerHTML = clean.map(function(nombre) {
+    return '<span class="chip-item"><i class="bi bi-person"></i>' + escHtml(nombre) + '</span>';
+  }).join('');
+}
+
+function toggleProfesionalGuardia(nombre, checked) {
+  var current = getSelectedProfesionalesGuardia();
+  var idx = current.indexOf(nombre);
+  if (checked && idx === -1) current.push(nombre);
+  if (!checked && idx !== -1) current.splice(idx, 1);
+  setSelectedProfesionalesGuardia(current);
+}
+
+function toggleProfesionalGuardiaByIndex(index, checked) {
+  var nombre = APP.catalogProfesionales[index];
+  if (!nombre) return;
+  toggleProfesionalGuardia(nombre, checked);
+}
+
+function renderProfesionalesGuardiaSelector(opciones) {
+  var cont = document.getElementById('mp-prof-list');
+  if (!cont) return;
+  APP.catalogProfesionales = (opciones || []).slice();
+  if (!opciones || !opciones.length) {
+    cont.innerHTML = '<div class="text-muted small">No hay profesionales en catálogo (tipo: ProfesionalGuardia).</div>';
+    setSelectedProfesionalesGuardia([]);
+    return;
+  }
+  var selected = getSelectedProfesionalesGuardia();
+  cont.innerHTML = opciones.map(function(nombre, i) {
+    var id = 'mp-prof-opt-' + i;
+    var checked = selected.indexOf(nombre) !== -1 ? ' checked' : '';
+    return '<div class="form-check">' +
+      '<input class="form-check-input" type="checkbox" id="' + id + '"' + checked +
+      ' onchange="toggleProfesionalGuardiaByIndex(' + i + ', this.checked)">' +
+      '<label class="form-check-label small" for="' + id + '">' + escHtml(nombre) + '</label>' +
+      '</div>';
+  }).join('');
+  setSelectedProfesionalesGuardia(selected);
 }
 
 // ══════════════════════════════════════════════════════
@@ -1507,15 +1559,25 @@ function poblarSelectoresCatalogos() {
   var areas   = cat.Area        || [];
   var tipos   = cat.TipoEntrada || [];
   var tper    = cat.TipoPeriodo || [];
+  var eParte  = cat.EstadoParte || ['borrador', 'cerrado'];
+  var eInc    = cat.EstadoIncidencia || ['abierta','resuelta','informativa','cerrada'];
+  var priors  = cat.Prioridad || ['baja','media','alta','crítica'];
+  var profs   = cat.ProfesionalGuardia || [];
 
   // Modal parte
   llenarSelect('mp-tipo', tper);
+  llenarSelect('mp-estado', eParte, 'borrador');
+  renderProfesionalesGuardiaSelector(profs);
   // Modal incidencia
   llenarSelect('mi-area', areas);
   llenarSelect('mi-tipo', tipos);
+  llenarSelect('mi-prioridad', priors, 'media');
+  llenarSelect('mi-estado', eInc, 'abierta');
   // Búsqueda
   llenarSelect('bq-area', areas);
   llenarSelect('bq-tipo', tipos);
+  llenarSelect('bq-prioridad', priors);
+  llenarSelect('bq-estado', eInc);
   // Informes
   llenarSelect('inf-area', areas);
   llenarSelect('inf-tipo', tipos);
@@ -1764,7 +1826,9 @@ function renderIncidencias() {
     return;
   }
 
-  var estadosOpts = ['abierta','resuelta','informativa','cerrada'];
+  var estadosOpts = (APP.catalogos && APP.catalogos.EstadoIncidencia && APP.catalogos.EstadoIncidencia.length)
+    ? APP.catalogos.EstadoIncidencia
+    : ['abierta','resuelta','informativa','cerrada'];
 
   cont.innerHTML = lista.map(function(inc) {
     var prioClass = 'prio-' + (inc.prioridad||'media').replace('í','i');
@@ -1908,9 +1972,11 @@ function confirmarEliminarParte(id) {
 
 function abrirModalParte(id) {
   // Limpiar formulario
-  ['mp-id','mp-inicio','mp-fin','mp-profesionales','mp-observaciones'].forEach(function(fId) {
+  ['mp-id','mp-inicio','mp-fin','mp-observaciones'].forEach(function(fId) {
     document.getElementById(fId).value = '';
   });
+  setSelectedProfesionalesGuardia([]);
+  renderProfesionalesGuardiaSelector((APP.catalogos && APP.catalogos.ProfesionalGuardia) || []);
   document.getElementById('mp-tipo').value   = '';
   document.getElementById('mp-estado').value = 'borrador';
   document.getElementById('modalParteLbl').textContent = id ? 'Editar parte' : 'Nuevo parte de guardia';
@@ -1931,7 +1997,8 @@ function abrirModalParte(id) {
       document.getElementById('mp-fin').value          = toLocal(p.fechaFin);
       document.getElementById('mp-tipo').value         = p.tipoPeriodo   || '';
       document.getElementById('mp-estado').value       = p.estado        || 'borrador';
-      document.getElementById('mp-profesionales').value= p.profesionales || '';
+      setSelectedProfesionalesGuardia(p.profesionalesLista || []);
+      renderProfesionalesGuardiaSelector((APP.catalogos && APP.catalogos.ProfesionalGuardia) || []);
       document.getElementById('mp-observaciones').value= p.observaciones || '';
       APP.modalParteInst.show();
     });
@@ -1954,7 +2021,7 @@ function guardarParte() {
   var fin    = document.getElementById('mp-fin').value;
   var tipo   = document.getElementById('mp-tipo').value;
   var estado = document.getElementById('mp-estado').value;
-  var profs  = document.getElementById('mp-profesionales').value.trim();
+  var profs  = getSelectedProfesionalesGuardia();
   var obs    = document.getElementById('mp-observaciones').value.trim();
 
   if (!inicio) { toast('La fecha de inicio es obligatoria.', 'warning'); return; }
@@ -1965,7 +2032,7 @@ function guardarParte() {
     fechaInicio: new Date(inicio).toISOString(),
     fechaFin:    new Date(fin).toISOString(),
     tipoPeriodo: tipo, estado: estado,
-    profesionales: profs, observaciones: obs
+    profesionalesLista: profs, observaciones: obs
   };
 
   if (id) {

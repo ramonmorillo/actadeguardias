@@ -115,3 +115,56 @@ function formatBytes(bytes) {
   var i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }
+
+// ── Normalización de listas (compatibilidad + formato canónico) ──────────
+
+function parseListValue(value) {
+  if (value === null || value === undefined) return [];
+  if (Array.isArray(value)) {
+    return value
+      .map(function(v) { return (v || '').toString().trim(); })
+      .filter(function(v) { return !!v; });
+  }
+
+  var text = value.toString().trim();
+  if (!text) return [];
+
+  // Formato canónico: JSON array serializado
+  if (text.charAt(0) === '[') {
+    try {
+      var parsed = JSON.parse(text);
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map(function(v) { return (v || '').toString().trim(); })
+          .filter(function(v) { return !!v; });
+      }
+    } catch (e) {}
+  }
+
+  // Compatibilidad con histórico: texto separado por comas/;|saltos
+  return text
+    .split(/[,\n;|]+/)
+    .map(function(v) { return v.trim(); })
+    .filter(function(v) { return !!v; });
+}
+
+function uniqueCaseInsensitive(list) {
+  var out = [];
+  var seen = {};
+  list.forEach(function(v) {
+    var key = v.toLowerCase();
+    if (!seen[key]) {
+      seen[key] = true;
+      out.push(v);
+    }
+  });
+  return out;
+}
+
+function stringifyListValue(list) {
+  return JSON.stringify(uniqueCaseInsensitive(parseListValue(list)));
+}
+
+function displayListValue(value) {
+  return parseListValue(value).join(', ');
+}
