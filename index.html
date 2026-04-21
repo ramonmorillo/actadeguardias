@@ -117,7 +117,7 @@
 
     .chip-list { display:flex; flex-wrap:wrap; gap:.35rem; margin-top:.4rem; }
     .chip-item { display:inline-flex; align-items:center; gap:.3rem; padding:.2rem .55rem; border-radius:999px; background:#e8f0fe; color:#174ea6; font-size:.78rem; border:1px solid #d2e3fc; }
-    #mp-prof-list { max-height: 190px; overflow:auto; border:1px solid var(--borde); border-radius:8px; padding:.5rem .65rem; background:#fff; }
+    #mp-prof-list, #mp-area-list { max-height: 190px; overflow:auto; border:1px solid var(--borde); border-radius:8px; padding:.5rem .65rem; background:#fff; }
 
     /* ── Responsive util ── */
     @media (max-width: 768px) {
@@ -964,14 +964,14 @@
               <option value="">— Selecciona —</option>
             </select>
           </div>
-          <div class="col-12">
+          <div class="col-md-6">
             <label class="form-label">Profesionales de guardia</label>
             <div id="mp-prof-list"></div>
             <div id="mp-prof-chip-list" class="chip-list"></div>
             <input type="hidden" id="mp-profesionales">
             <div class="form-text">Selecciona uno o varios profesionales del catálogo.</div>
           </div>
-          <div class="col-12">
+          <div class="col-md-6">
             <label class="form-label">Áreas implicadas en el parte</label>
             <div id="mp-area-list"></div>
             <div id="mp-area-chip-list" class="chip-list"></div>
