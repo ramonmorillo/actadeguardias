@@ -16,23 +16,54 @@ function generateInforme(params) {
     var schemaPartes = getPartesSchema();
     var schemaInc = getIncidenciasSchema();
     params = params || {};
-    var desde = params.fechaDesde ? new Date(params.fechaDesde) : null;
-    var hasta  = params.fechaHasta ? new Date(params.fechaHasta) : null;
-    if (hasta) hasta.setHours(23, 59, 59, 999);
+    var desde = normalizeDateInput(params.fechaDesde, 'Europe/Madrid', false);
+    var hasta = normalizeDateInput(params.fechaHasta, 'Europe/Madrid', true);
+    if (desde && hasta && desde > hasta) {
+      throw new Error('Rango de fechas inválido: "fechaDesde" debe ser anterior o igual a "fechaHasta".');
+    }
 
     // ── 1. Partes en el rango (filtrados por FechaInicio) ─────────────────
     var partesRaw    = getAllRaw(CONFIG.SHEETS.PARTES);
     var partes       = [];
     var parteIdSet   = {};  // lookup rápido
     var porAreaParte = {};
+    var areasCatalogo = CONFIG.AREAS;
+    try {
+      var c = getCatalogos();
+      areasCatalogo = (c && c.success && c.data && c.data.Area && c.data.Area.length) ? c.data.Area : CONFIG.AREAS;
+    } catch (catalogErr) {
+      logErr('generateInforme.getCatalogos', catalogErr);
+    }
 
     for (var i = 1; i < partesRaw.length; i++) {
       var pr = partesRaw[i];
-      if (!rowVal(pr, schemaPartes.ID)) continue;
-      var fi = new Date(rowVal(pr, schemaPartes.FECHA_INICIO));
-      if (desde && fi < desde) continue;
-      if (hasta && fi > hasta) continue;
-      var parteObj = rowToParte(pr);
+      var parteId = normalizeIdKey(rowVal(pr, schemaPartes.ID));
+      if (!parteId) continue;
+      var fiRaw = rowVal(pr, schemaPartes.FECHA_INICIO);
+      if (!isDateInRange(fiRaw, desde, hasta)) continue;
+
+      var parteObj;
+      try {
+        parteObj = rowToParte(pr, { schema: schemaPartes, areasCatalogo: areasCatalogo });
+      } catch (eRow) {
+        logErr('generateInforme.rowToParte', eRow);
+        parteObj = {
+          id: parteId,
+          fechaInicio: toISO(fiRaw),
+          fechaFin: toISO(rowVal(pr, schemaPartes.FECHA_FIN)),
+          tipoPeriodo: rowVal(pr, schemaPartes.TIPO_PERIODO),
+          profesionales: displayListValue(rowVal(pr, schemaPartes.PROFESIONALES)),
+          profesionalesLista: parseListValue(rowVal(pr, schemaPartes.PROFESIONALES)),
+          areasImplicadas: displayListValue(rowVal(pr, schemaPartes.AREAS_IMPLICADAS)),
+          areasImplicadasLista: parseListValue(rowVal(pr, schemaPartes.AREAS_IMPLICADAS)),
+          creadoPor: rowVal(pr, schemaPartes.CREADO_POR),
+          fechaCreacion: toISO(rowVal(pr, schemaPartes.FECHA_CREACION)),
+          ultimaModificacion: toISO(rowVal(pr, schemaPartes.ULTIMA_MODIFICACION)),
+          modificadoPor: rowVal(pr, schemaPartes.MODIFICADO_POR),
+          estado: rowVal(pr, schemaPartes.ESTADO),
+          observaciones: rowVal(pr, schemaPartes.OBSERVACIONES)
+        };
+      }
       partes.push(parteObj);
       parteIdSet[parteObj.id] = true;
       (parteObj.areasImplicadasLista || []).forEach(function(areaParte) {

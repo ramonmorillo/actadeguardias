@@ -1530,9 +1530,10 @@ function llamar(fnName, args, spinnerMsg, onSuccess, onError) {
   var run = google.script.run
     .withSuccessHandler(function(result) {
       hideSpinner();
-      if (!result || !result.success) {
-        var msg = (result && result.message)
-          ? result.message
+      var isOk = !!(result && (result.success === true || result.ok === true));
+      if (!isOk) {
+        var msg = (result && (result.message || result.error))
+          ? (result.message || result.error)
           : ('Error al ejecutar "' + fnName + '".');
         var low = msg.toLowerCase();
         if (low.indexOf('sesión') !== -1 &&

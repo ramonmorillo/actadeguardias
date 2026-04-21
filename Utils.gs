@@ -93,11 +93,51 @@ function requireField(value, name) {
 // ── Respuestas estándar ────────────────────────────────────────────────────
 
 function ok(data, message) {
-  return { success: true, data: data !== undefined ? data : null, message: message || '' };
+  return {
+    ok: true,
+    success: true,
+    data: data !== undefined ? data : null,
+    error: null,
+    message: message || ''
+  };
 }
 
 function fail(message, data) {
-  return { success: false, data: data !== undefined ? data : null, message: message };
+  var msg = message || 'Error no especificado.';
+  return {
+    ok: false,
+    success: false,
+    data: data !== undefined ? data : null,
+    error: msg,
+    message: msg
+  };
+}
+
+function normalizeDateInput(value, tz, endOfDay) {
+  if (value === null || value === undefined || value === '') return null;
+  var d = (value instanceof Date) ? new Date(value.getTime()) : new Date(value);
+  if (isNaN(d.getTime())) throw new Error('Fecha inválida: ' + value);
+
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value.trim())) {
+    var parts = value.split('-');
+    d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+  }
+
+  if (endOfDay) {
+    d.setHours(23, 59, 59, 999);
+  } else {
+    d.setHours(0, 0, 0, 0);
+  }
+  return d;
+}
+
+function isDateInRange(dateValue, desde, hasta) {
+  if (dateValue === null || dateValue === undefined || dateValue === '') return false;
+  var d = (dateValue instanceof Date) ? dateValue : new Date(dateValue);
+  if (isNaN(d.getTime())) return false;
+  if (desde && d < desde) return false;
+  if (hasta && d > hasta) return false;
+  return true;
 }
 
 // ── Logging ────────────────────────────────────────────────────────────────

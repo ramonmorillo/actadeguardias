@@ -242,8 +242,13 @@ function listPartesConConteo(limit) {
     var schema = getPartesSchema();
     var partesRaw = getAllRaw(CONFIG.SHEETS.PARTES);
     if (partesRaw.length <= 1) return ok([]);
-    var c = getCatalogos();
-    var areasCatalogo = (c && c.success && c.data && c.data.Area) ? c.data.Area : CONFIG.AREAS;
+    var areasCatalogo = CONFIG.AREAS;
+    try {
+      var c = getCatalogos();
+      areasCatalogo = (c && c.success && c.data && c.data.Area && c.data.Area.length) ? c.data.Area : CONFIG.AREAS;
+    } catch (catalogErr) {
+      logErr('listPartesConConteo.getCatalogos', catalogErr);
+    }
 
     var partes = partesRaw.slice(1)
       .filter(function(r) { return !!normalizeIdKey(rowVal(r, schema.ID)); })
