@@ -44,14 +44,15 @@ function validateAreaIncidencia(area) {
 function createIncidencia(token, data) {
   try {
     var user = requireEditPermission(token);
-    requireField(data.idParte,     'Parte asociado');
+    var idParte = normalizeIdKey(requireField(data.idParte, 'Parte asociado'));
     requireField(data.descripcion, 'Descripción');
     requireField(data.area,        'Área');
     requireField(data.tipoEntrada, 'Tipo de entrada');
     var areaValidada = validateAreaIncidencia(data.area);
-    var parte = findRow(CONFIG.SHEETS.PARTES, COLS.PARTES.ID, data.idParte);
-    if (!parte) throw new Error('Parte no encontrado: ' + data.idParte);
-    if (parte.row[COLS.PARTES.ESTADO] === CONFIG.ESTADOS_PARTE.CERRADO &&
+    var schemaPartes = getPartesSchema();
+    var parte = findRow(CONFIG.SHEETS.PARTES, schemaPartes.ID, idParte);
+    if (!parte) throw new Error('Parte no encontrado: ' + idParte);
+    if (rowVal(parte.row, schemaPartes.ESTADO) === CONFIG.ESTADOS_PARTE.CERRADO &&
         user.rol !== CONFIG.ROLES.ADMIN) {
       throw new Error('El parte está cerrado. Solo un administrador puede añadir incidencias.');
     }
@@ -67,7 +68,7 @@ function createIncidencia(token, data) {
 
     appendRow(CONFIG.SHEETS.INCIDENCIAS, [
       id,
-      data.idParte,
+      idParte,
       data.fechaEvento ? new Date(data.fechaEvento) : now,
       areaValidada,
       data.tipoEntrada,
@@ -105,11 +106,12 @@ function getIncidencia(id) {
 
 function listIncidenciasByParte(parteId) {
   try {
+    var parteKey = normalizeIdKey(parteId);
     var data = getAllRaw(CONFIG.SHEETS.INCIDENCIAS);
     if (data.length <= 1) return ok([]);
     var list = [];
     for (var i = 1; i < data.length; i++) {
-      if (data[i][COLS.INCIDENCIAS.ID_PARTE] === parteId && data[i][COLS.INCIDENCIAS.ID]) {
+      if (normalizeIdKey(data[i][COLS.INCIDENCIAS.ID_PARTE]) === parteKey && data[i][COLS.INCIDENCIAS.ID]) {
         list.push(rowToIncidencia(data[i]));
       }
     }

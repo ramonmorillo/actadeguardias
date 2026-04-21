@@ -139,6 +139,16 @@ function parseListValue(value) {
           .filter(function(v) { return !!v; });
       }
     } catch (e) {}
+    // Compatibilidad: pseudo-JSON histórico con comillas simples
+    try {
+      var fixed = text.replace(/'/g, '"');
+      var parsedFixed = JSON.parse(fixed);
+      if (Array.isArray(parsedFixed)) {
+        return parsedFixed
+          .map(function(v) { return (v || '').toString().trim(); })
+          .filter(function(v) { return !!v; });
+      }
+    } catch (e2) {}
   }
 
   // Compatibilidad con histórico: texto separado por comas/;|saltos
@@ -146,6 +156,11 @@ function parseListValue(value) {
     .split(/[,\n;|]+/)
     .map(function(v) { return v.trim(); })
     .filter(function(v) { return !!v; });
+}
+
+function normalizeIdKey(value) {
+  if (value === null || value === undefined) return '';
+  return value.toString().replace(/\u00A0/g, ' ').trim();
 }
 
 function uniqueCaseInsensitive(list) {
