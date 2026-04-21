@@ -1,0 +1,2017 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guardias · Farmacia</title>
+
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <style>
+    /* ── Paleta y variables ── */
+    :root {
+      --azul:    #1a73e8;
+      --azul-o:  #1558b0;
+      --gris-bg: #f1f3f4;
+      --borde:   #dadce0;
+      --texto:   #202124;
+      --muted:   #5f6368;
+    }
+
+    body { background: var(--gris-bg); color: var(--texto); font-family: "Segoe UI", system-ui, sans-serif; }
+
+    /* ── Navbar ── */
+    .navbar-brand { font-weight: 700; letter-spacing: -.3px; }
+    .navbar-dark .navbar-nav .nav-link { color: rgba(255,255,255,.85); }
+    .navbar-dark .navbar-nav .nav-link:hover,
+    .navbar-dark .navbar-nav .nav-link.active { color: #fff; }
+
+    /* ── Contenido principal ── */
+    #main-content { padding: 1.5rem; }
+
+    /* ── Tarjetas KPI ── */
+    .kpi-card { border: 1px solid var(--borde); border-radius: 8px; background: #fff;
+                padding: 1.1rem 1.4rem; display: flex; align-items: center; gap: 1rem; }
+    .kpi-icon { width: 44px; height: 44px; border-radius: 50%; display: flex;
+                align-items: center; justify-content: center; font-size: 1.3rem; flex-shrink: 0; }
+    .kpi-num  { font-size: 1.7rem; font-weight: 700; line-height: 1; }
+    .kpi-lbl  { font-size: .78rem; color: var(--muted); }
+
+    /* ── Tablas ── */
+    .table-card { background: #fff; border: 1px solid var(--borde); border-radius: 8px; overflow: hidden; }
+    .table-card .table { margin-bottom: 0; }
+    .table-card .table thead th { background: #f8f9fa; font-size: .78rem;
+                                  text-transform: uppercase; letter-spacing: .4px;
+                                  color: var(--muted); border-bottom: 1px solid var(--borde); }
+    .table-card .table tbody td { vertical-align: middle; font-size: .875rem; }
+    .table-card .table-hover tbody tr:hover { background: #f0f7ff; }
+
+    /* ── Badges de estado/prioridad ── */
+    .badge-estado-borrador   { background: #e8eaed; color: #5f6368; }
+    .badge-estado-cerrado    { background: #3c4043; color: #fff; }
+    .badge-estado-abierta    { background: #fce8b2; color: #b06000; }
+    .badge-estado-resuelta   { background: #ceead6; color: #137333; }
+    .badge-estado-informativa{ background: #d2e3fc; color: #1967d2; }
+    .badge-estado-cerrada    { background: #e8eaed; color: #5f6368; }
+
+    .badge-prio-baja    { background: #ceead6; color: #137333; }
+    .badge-prio-media   { background: #fce8b2; color: #b06000; }
+    .badge-prio-alta    { background: #fde7cc; color: #b45309; }
+    .badge-prio-critica { background: #fce8e6; color: #c5221f; }
+
+    /* ── Formularios ── */
+    .form-label { font-weight: 500; font-size: .875rem; }
+    .form-section-title { font-size: .78rem; text-transform: uppercase;
+                          letter-spacing: .5px; color: var(--muted);
+                          border-bottom: 1px solid var(--borde);
+                          padding-bottom: .35rem; margin-bottom: .8rem; }
+    .privacy-notice { background: #fff3cd; border: 1px solid #ffc107;
+                      border-radius: 6px; padding: .6rem .9rem;
+                      font-size: .82rem; color: #664d03; }
+
+    /* ── Sección vista activa ── */
+    .view { display: none; }
+    .view.active { display: block; }
+
+    /* ── Breadcrumb sencillo ── */
+    .vista-header { display: flex; align-items: center; gap: .6rem;
+                    margin-bottom: 1.2rem; flex-wrap: wrap; }
+    .vista-header h4 { margin: 0; font-weight: 600; }
+
+    /* ── Incidencia card en detalle de parte ── */
+    .inc-card { border: 1px solid var(--borde); border-radius: 8px;
+                background: #fff; padding: 1rem; margin-bottom: .7rem;
+                border-left: 4px solid #dadce0; transition: box-shadow .15s; }
+    .inc-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.1); }
+    .inc-card.prio-baja    { border-left-color: #34a853; }
+    .inc-card.prio-media   { border-left-color: #fbbc04; }
+    .inc-card.prio-alta    { border-left-color: #fa7b17; }
+    .inc-card.prio-critica { border-left-color: #ea4335; }
+
+    /* ── Spinner overlay ── */
+    #spinner-overlay { display: none; position: fixed; inset: 0;
+                       background: rgba(255,255,255,.65); z-index: 9999;
+                       align-items: center; justify-content: center; }
+    #spinner-overlay.visible { display: flex; }
+
+    /* ── Toast ── */
+    #toast-container { position: fixed; bottom: 1.2rem; right: 1.2rem; z-index: 10000; }
+
+    /* ── Paginación compacta ── */
+    .pagination-sm .page-link { font-size: .8rem; padding: .3rem .6rem; }
+
+    /* ── Gráficos ── */
+    .chart-wrap { position: relative; height: 260px; }
+
+    /* ── Adjuntos ── */
+    .adj-item { display: flex; align-items: center; gap: .6rem;
+                padding: .4rem .6rem; border: 1px solid var(--borde);
+                border-radius: 6px; background: #f8f9fa; font-size: .82rem; }
+    .adj-item a { color: var(--azul); text-decoration: none; font-weight: 500; }
+    .adj-item a:hover { text-decoration: underline; }
+
+    /* ── Responsive util ── */
+    @media (max-width: 768px) {
+      #main-content { padding: .75rem; }
+      .kpi-num { font-size: 1.4rem; }
+    }
+  </style>
+</head>
+
+<body>
+
+<!-- ╔══════════════════════════════════════════════════════╗
+     ║  NAVBAR                                              ║
+     ╚══════════════════════════════════════════════════════╝ -->
+<nav class="navbar navbar-expand-lg navbar-dark" style="background:var(--azul);">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="#" onclick="showView('dashboard')">
+      <i class="bi bi-capsule me-1"></i>Guardias Farmacia
+    </a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navMenu">
+      <ul class="navbar-nav me-auto">
+        <li class="nav-item">
+          <a class="nav-link" href="#" id="nav-dashboard"  onclick="showView('dashboard')">
+            <i class="bi bi-house me-1"></i>Inicio
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="#" id="nav-historico"  onclick="showView('historico')">
+            <i class="bi bi-archive me-1"></i>Histórico
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="#" id="nav-busqueda"   onclick="showView('busqueda')">
+            <i class="bi bi-search me-1"></i>Búsqueda
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="#" id="nav-informes"   onclick="showView('informes')">
+            <i class="bi bi-file-earmark-bar-graph me-1"></i>Informes
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="#" id="nav-estadisticas" onclick="showView('estadisticas')">
+            <i class="bi bi-graph-up me-1"></i>Estadísticas
+          </a>
+        </li>
+      </ul>
+      <span class="navbar-text me-3" id="user-badge" style="font-size:.82rem;opacity:.85;">
+        <i class="bi bi-person-circle me-1"></i><span id="user-name">…</span>
+        <span id="user-rol" class="badge bg-light text-dark ms-1" style="font-size:.7rem;"></span>
+      </span>
+    </div>
+  </div>
+</nav>
+
+<!-- ╔══════════════════════════════════════════════════════╗
+     ║  CONTENIDO PRINCIPAL                                 ║
+     ╚══════════════════════════════════════════════════════╝ -->
+<div id="main-content" class="container-fluid">
+
+  <!-- AVISO DE PRIVACIDAD (siempre visible arriba) -->
+  <div class="privacy-notice mb-3">
+    <i class="bi bi-shield-exclamation me-1"></i>
+    <strong>Protección de datos:</strong> No incluyas en ningún campo identificadores directos de pacientes (DNI, NHC, SIP, nombre completo, tarjeta sanitaria).
+  </div>
+
+  <!-- ── VISTAS ──────────────────────────────────────── -->
+
+  <!-- DASHBOARD -->
+  <div id="view-dashboard" class="view">
+
+    <div class="vista-header">
+      <h4><i class="bi bi-house-fill text-primary me-1"></i>Panel de inicio</h4>
+      <button class="btn btn-primary btn-sm ms-auto" onclick="abrirModalParte(null)">
+        <i class="bi bi-plus-lg me-1"></i>Nuevo parte
+      </button>
+    </div>
+
+    <!-- KPIs -->
+    <div class="row g-3 mb-4" id="dash-kpis">
+      <div class="col-6 col-md-3">
+        <div class="kpi-card">
+          <div class="kpi-icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-folder2-open"></i></div>
+          <div><div class="kpi-num" id="kpi-partes">—</div><div class="kpi-lbl">Partes (últimos 90 días)</div></div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="kpi-card">
+          <div class="kpi-icon bg-warning bg-opacity-10 text-warning"><i class="bi bi-exclamation-triangle"></i></div>
+          <div><div class="kpi-num" id="kpi-abiertas">—</div><div class="kpi-lbl">Incidencias abiertas</div></div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="kpi-card">
+          <div class="kpi-icon bg-danger bg-opacity-10 text-danger"><i class="bi bi-fire"></i></div>
+          <div><div class="kpi-num" id="kpi-criticas">—</div><div class="kpi-lbl">Críticas</div></div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="kpi-card">
+          <div class="kpi-icon bg-success bg-opacity-10 text-success"><i class="bi bi-check-circle"></i></div>
+          <div><div class="kpi-num" id="kpi-resueltas">—</div><div class="kpi-lbl">Resueltas</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Partes recientes -->
+    <div class="table-card mb-4">
+      <div class="d-flex align-items-center px-3 py-2 border-bottom">
+        <span class="fw-semibold"><i class="bi bi-clock-history me-1 text-muted"></i>Partes recientes</span>
+        <a href="#" class="ms-auto small text-primary" onclick="showView('historico')">Ver todos</a>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead>
+            <tr>
+              <th>ID</th><th>Periodo</th><th>Tipo</th>
+              <th>Profesionales</th><th>Estado</th><th>Creado por</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="dash-partes-body">
+            <tr><td colspan="7" class="text-center text-muted py-3">Cargando…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Incidencias críticas/abiertas recientes -->
+    <div class="table-card">
+      <div class="d-flex align-items-center px-3 py-2 border-bottom">
+        <span class="fw-semibold"><i class="bi bi-exclamation-circle me-1 text-danger"></i>Incidencias abiertas recientes</span>
+        <a href="#" class="ms-auto small text-primary" onclick="showView('busqueda')">Buscar más</a>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead>
+            <tr>
+              <th>Fecha</th><th>Área</th><th>Tipo</th>
+              <th>Descripción</th><th>Prioridad</th><th>Estado</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="dash-incidencias-body">
+            <tr><td colspan="7" class="text-center text-muted py-3">Cargando…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- HISTÓRICO -->
+  <div id="view-historico" class="view">
+
+    <div class="vista-header">
+      <h4><i class="bi bi-archive-fill text-primary me-1"></i>Histórico de partes</h4>
+      <button class="btn btn-primary btn-sm ms-auto" onclick="abrirModalParte(null)">
+        <i class="bi bi-plus-lg me-1"></i>Nuevo parte
+      </button>
+    </div>
+
+    <!-- Filtros rápidos -->
+    <div class="card border-0 shadow-sm mb-3" style="border-radius:8px;">
+      <div class="card-body py-2">
+        <div class="row g-2 align-items-end">
+          <div class="col-sm-4">
+            <label class="form-label mb-1" style="font-size:.8rem;">Buscar por ID / profesional</label>
+            <input type="text" class="form-control form-control-sm" id="hist-filtro-texto"
+                   placeholder="PG-… o nombre" oninput="filtrarHistorico()">
+          </div>
+          <div class="col-sm-3">
+            <label class="form-label mb-1" style="font-size:.8rem;">Tipo de periodo</label>
+            <select class="form-select form-select-sm" id="hist-filtro-tipo" onchange="filtrarHistorico()">
+              <option value="">Todos</option>
+            </select>
+          </div>
+          <div class="col-sm-3">
+            <label class="form-label mb-1" style="font-size:.8rem;">Estado</label>
+            <select class="form-select form-select-sm" id="hist-filtro-estado" onchange="filtrarHistorico()">
+              <option value="">Todos</option>
+              <option value="borrador">Borrador</option>
+              <option value="cerrado">Cerrado</option>
+            </select>
+          </div>
+          <div class="col-sm-2">
+            <button class="btn btn-outline-secondary btn-sm w-100" onclick="limpiarFiltrosHistorico()">
+              <i class="bi bi-x-circle me-1"></i>Limpiar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead>
+            <tr>
+              <th>ID</th><th>Fecha inicio</th><th>Fecha fin</th>
+              <th>Tipo</th><th>Profesionales</th><th>Incidencias</th>
+              <th>Estado</th><th>Creado por</th><th class="text-end">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="hist-body">
+            <tr><td colspan="9" class="text-center text-muted py-3">Cargando…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="d-flex justify-content-between align-items-center px-3 py-2 border-top">
+        <span class="text-muted small" id="hist-count"></span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- DETALLE DE PARTE -->
+  <div id="view-parte" class="view">
+
+    <!-- Cabecera -->
+    <div class="vista-header">
+      <button class="btn btn-outline-secondary btn-sm" onclick="showView('historico')">
+        <i class="bi bi-arrow-left"></i>
+      </button>
+      <h4 id="parte-titulo">Parte de guardia</h4>
+      <div class="ms-auto d-flex gap-2 flex-wrap">
+        <button class="btn btn-outline-primary btn-sm" id="btn-editar-parte" onclick="abrirModalParte(APP.currentParteId)">
+          <i class="bi bi-pencil me-1"></i>Editar parte
+        </button>
+        <button class="btn btn-outline-secondary btn-sm" id="btn-cerrar-parte" onclick="cerrarParte()">
+          <i class="bi bi-lock me-1"></i>Cerrar parte
+        </button>
+        <button class="btn btn-outline-secondary btn-sm" onclick="duplicarParte()">
+          <i class="bi bi-copy me-1"></i>Duplicar
+        </button>
+      </div>
+    </div>
+
+    <!-- Metadatos del parte -->
+    <div class="card border-0 shadow-sm mb-3" style="border-radius:8px;">
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-sm-4">
+            <div class="text-muted small mb-1">Periodo</div>
+            <div id="parte-periodo" class="fw-semibold">—</div>
+          </div>
+          <div class="col-sm-2">
+            <div class="text-muted small mb-1">Tipo</div>
+            <div id="parte-tipo">—</div>
+          </div>
+          <div class="col-sm-2">
+            <div class="text-muted small mb-1">Estado</div>
+            <div id="parte-estado">—</div>
+          </div>
+          <div class="col-sm-4">
+            <div class="text-muted small mb-1">Profesionales de guardia</div>
+            <div id="parte-profesionales">—</div>
+          </div>
+          <div class="col-12">
+            <div class="text-muted small mb-1">Observaciones generales</div>
+            <div id="parte-observaciones" class="fst-italic text-secondary">—</div>
+          </div>
+          <div class="col-sm-6">
+            <div class="text-muted small mb-1">Creado por / Fecha</div>
+            <div id="parte-meta" class="small">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Incidencias del parte -->
+    <div class="d-flex align-items-center mb-2">
+      <span class="fw-semibold">Incidencias <span class="badge bg-secondary ms-1" id="inc-count-badge">0</span></span>
+      <button class="btn btn-primary btn-sm ms-auto" id="btn-nueva-incidencia"
+              onclick="abrirModalIncidencia(null)">
+        <i class="bi bi-plus-lg me-1"></i>Añadir incidencia
+      </button>
+    </div>
+
+    <!-- Orden/filtro rápido incidencias -->
+    <div class="d-flex gap-2 mb-3 flex-wrap">
+      <select class="form-select form-select-sm" style="max-width:180px;"
+              id="inc-filtro-area" onchange="renderIncidencias()">
+        <option value="">Todas las áreas</option>
+      </select>
+      <select class="form-select form-select-sm" style="max-width:160px;"
+              id="inc-filtro-prio" onchange="renderIncidencias()">
+        <option value="">Cualquier prioridad</option>
+        <option value="crítica">Crítica</option>
+        <option value="alta">Alta</option>
+        <option value="media">Media</option>
+        <option value="baja">Baja</option>
+      </select>
+      <select class="form-select form-select-sm" style="max-width:160px;"
+              id="inc-filtro-estado" onchange="renderIncidencias()">
+        <option value="">Cualquier estado</option>
+        <option value="abierta">Abierta</option>
+        <option value="resuelta">Resuelta</option>
+        <option value="informativa">Informativa</option>
+        <option value="cerrada">Cerrada</option>
+      </select>
+    </div>
+
+    <div id="incidencias-container">
+      <div class="text-center text-muted py-4">Cargando incidencias…</div>
+    </div>
+
+  </div>
+
+  <!-- BÚSQUEDA -->
+  <div id="view-busqueda" class="view">
+
+    <div class="vista-header">
+      <h4><i class="bi bi-search text-primary me-1"></i>Búsqueda avanzada</h4>
+    </div>
+
+    <!-- Panel de filtros -->
+    <div class="card border-0 shadow-sm mb-3" style="border-radius:8px;">
+      <div class="card-body">
+        <div class="row g-2">
+          <div class="col-12">
+            <label class="form-label">Texto libre <span class="text-muted small">(descripción, actuación, medicamentos, servicio, etiquetas)</span></label>
+            <input type="text" class="form-control" id="bq-texto" placeholder="Escribir para buscar…">
+          </div>
+          <div class="col-sm-4 col-md-3">
+            <label class="form-label">Fecha desde</label>
+            <input type="date" class="form-control" id="bq-desde">
+          </div>
+          <div class="col-sm-4 col-md-3">
+            <label class="form-label">Fecha hasta</label>
+            <input type="date" class="form-control" id="bq-hasta">
+          </div>
+          <div class="col-sm-4 col-md-3">
+            <label class="form-label">Parte de guardia</label>
+            <select class="form-select" id="bq-parte">
+              <option value="">Cualquiera</option>
+            </select>
+          </div>
+          <div class="col-sm-4 col-md-3">
+            <label class="form-label">Área</label>
+            <select class="form-select" id="bq-area">
+              <option value="">Cualquier área</option>
+            </select>
+          </div>
+          <div class="col-sm-4 col-md-3">
+            <label class="form-label">Tipo de entrada</label>
+            <select class="form-select" id="bq-tipo">
+              <option value="">Cualquier tipo</option>
+            </select>
+          </div>
+          <div class="col-sm-4 col-md-3">
+            <label class="form-label">Medicamento</label>
+            <input type="text" class="form-control" id="bq-medicamento" placeholder="Nombre parcial">
+          </div>
+          <div class="col-sm-4 col-md-3">
+            <label class="form-label">Servicio / Ubicación</label>
+            <input type="text" class="form-control" id="bq-servicio" placeholder="Nombre parcial">
+          </div>
+          <div class="col-sm-4 col-md-3">
+            <label class="form-label">Prioridad</label>
+            <select class="form-select" id="bq-prioridad">
+              <option value="">Cualquiera</option>
+              <option value="crítica">Crítica</option>
+              <option value="alta">Alta</option>
+              <option value="media">Media</option>
+              <option value="baja">Baja</option>
+            </select>
+          </div>
+          <div class="col-sm-4 col-md-3">
+            <label class="form-label">Estado</label>
+            <select class="form-select" id="bq-estado">
+              <option value="">Cualquiera</option>
+              <option value="abierta">Abierta</option>
+              <option value="resuelta">Resuelta</option>
+              <option value="informativa">Informativa</option>
+              <option value="cerrada">Cerrada</option>
+            </select>
+          </div>
+          <div class="col-sm-4 col-md-3">
+            <label class="form-label">Registrado por</label>
+            <input type="text" class="form-control" id="bq-registrado" placeholder="Email o nombre">
+          </div>
+          <div class="col-sm-4 col-md-3">
+            <label class="form-label">Con adjuntos</label>
+            <select class="form-select" id="bq-adjuntos">
+              <option value="">Indistinto</option>
+              <option value="si">Con adjuntos</option>
+            </select>
+          </div>
+          <div class="col-12 d-flex gap-2 justify-content-end">
+            <button class="btn btn-outline-secondary" onclick="limpiarBusqueda()">
+              <i class="bi bi-x-circle me-1"></i>Limpiar
+            </button>
+            <button class="btn btn-primary" onclick="buscar(1)">
+              <i class="bi bi-search me-1"></i>Buscar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Resultados -->
+    <div id="bq-resultados" style="display:none;">
+      <div class="d-flex align-items-center mb-2">
+        <span class="text-muted small" id="bq-total-label"></span>
+      </div>
+      <div class="table-card">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead>
+              <tr>
+                <th>Fecha evento</th><th>Área</th><th>Tipo</th>
+                <th>Descripción</th><th>Medicamentos</th>
+                <th>Prioridad</th><th>Estado</th><th>Parte</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="bq-body"></tbody>
+          </table>
+        </div>
+        <!-- Paginación -->
+        <div class="d-flex justify-content-between align-items-center px-3 py-2 border-top">
+          <button class="btn btn-outline-secondary btn-sm" id="bq-prev"
+                  onclick="buscar(APP.bqPage-1)">
+            <i class="bi bi-chevron-left"></i> Anterior
+          </button>
+          <span class="text-muted small" id="bq-page-info"></span>
+          <button class="btn btn-outline-secondary btn-sm" id="bq-next"
+                  onclick="buscar(APP.bqPage+1)">
+            Siguiente <i class="bi bi-chevron-right"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- INFORMES -->
+  <div id="view-informes" class="view">
+
+    <div class="vista-header">
+      <h4><i class="bi bi-file-earmark-bar-graph-fill text-primary me-1"></i>Generación de informes</h4>
+    </div>
+
+    <!-- Parámetros del informe -->
+    <div class="card border-0 shadow-sm mb-3" style="border-radius:8px;">
+      <div class="card-header bg-transparent border-bottom fw-semibold py-2">Parámetros</div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-sm-4">
+            <label class="form-label">Fecha inicio <span class="text-danger">*</span></label>
+            <input type="date" class="form-control" id="inf-desde">
+          </div>
+          <div class="col-sm-4">
+            <label class="form-label">Fecha fin <span class="text-danger">*</span></label>
+            <input type="date" class="form-control" id="inf-hasta">
+          </div>
+          <div class="col-sm-4">
+            <label class="form-label">Área (opcional)</label>
+            <select class="form-select" id="inf-area">
+              <option value="">Todas las áreas</option>
+            </select>
+          </div>
+          <div class="col-sm-4">
+            <label class="form-label">Tipo de entrada (opcional)</label>
+            <select class="form-select" id="inf-tipo">
+              <option value="">Todos los tipos</option>
+            </select>
+          </div>
+          <div class="col-sm-4">
+            <label class="form-label">Prioridad (opcional)</label>
+            <select class="form-select" id="inf-prioridad">
+              <option value="">Cualquier prioridad</option>
+              <option value="crítica">Crítica</option>
+              <option value="alta">Alta</option>
+              <option value="media">Media</option>
+              <option value="baja">Baja</option>
+            </select>
+          </div>
+          <div class="col-sm-4">
+            <label class="form-label">Medicamento (opcional)</label>
+            <input type="text" class="form-control" id="inf-medicamento" placeholder="Nombre parcial">
+          </div>
+          <div class="col-12 d-flex gap-2 justify-content-end">
+            <button class="btn btn-outline-secondary" onclick="limpiarInforme()">
+              <i class="bi bi-x-circle me-1"></i>Limpiar
+            </button>
+            <button class="btn btn-primary" onclick="generarInforme()">
+              <i class="bi bi-play-fill me-1"></i>Generar informe
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Resultado del informe -->
+    <div id="inf-resultado" style="display:none;">
+
+      <!-- KPIs resumen -->
+      <div class="row g-3 mb-3">
+        <div class="col-6 col-sm-3">
+          <div class="kpi-card">
+            <div class="kpi-icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-folder2"></i></div>
+            <div><div class="kpi-num" id="inf-kpi-partes">—</div><div class="kpi-lbl">Partes</div></div>
+          </div>
+        </div>
+        <div class="col-6 col-sm-3">
+          <div class="kpi-card">
+            <div class="kpi-icon bg-warning bg-opacity-10 text-warning"><i class="bi bi-exclamation-triangle"></i></div>
+            <div><div class="kpi-num" id="inf-kpi-total">—</div><div class="kpi-lbl">Incidencias</div></div>
+          </div>
+        </div>
+        <div class="col-6 col-sm-3">
+          <div class="card border-0 shadow-sm p-3" style="border-radius:8px;">
+            <div class="text-muted small mb-1">Desglose por área</div>
+            <ul class="list-unstyled mb-0 small" id="inf-por-area"></ul>
+          </div>
+        </div>
+        <div class="col-6 col-sm-3">
+          <div class="card border-0 shadow-sm p-3" style="border-radius:8px;">
+            <div class="text-muted small mb-1">Desglose por tipo</div>
+            <ul class="list-unstyled mb-0 small" id="inf-por-tipo"></ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Botones exportación -->
+      <div class="d-flex gap-2 mb-3 flex-wrap">
+        <button class="btn btn-outline-success btn-sm" onclick="exportarCSV()">
+          <i class="bi bi-file-earmark-spreadsheet me-1"></i>Exportar CSV
+        </button>
+        <button class="btn btn-outline-danger btn-sm" onclick="exportarPDF()">
+          <i class="bi bi-file-earmark-pdf me-1"></i>Imprimir / PDF
+        </button>
+      </div>
+
+      <!-- Listado de incidencias del informe -->
+      <div class="table-card">
+        <div class="px-3 py-2 border-bottom fw-semibold small">Listado cronológico de incidencias</div>
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead>
+              <tr>
+                <th>Fecha evento</th><th>Área</th><th>Tipo</th>
+                <th>Descripción</th><th>Actuación</th><th>Medicamentos</th>
+                <th>Servicio</th><th>Prioridad</th><th>Estado</th>
+                <th>Registrado por</th><th>Parte</th>
+              </tr>
+            </thead>
+            <tbody id="inf-tabla-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ESTADÍSTICAS -->
+  <div id="view-estadisticas" class="view">
+
+    <div class="vista-header">
+      <h4><i class="bi bi-graph-up-arrow text-primary me-1"></i>Estadísticas</h4>
+      <div class="ms-auto d-flex gap-2 align-items-end flex-wrap">
+        <div>
+          <label class="form-label mb-1" style="font-size:.8rem;">Desde</label>
+          <input type="date" class="form-control form-control-sm" id="est-desde" style="width:140px;">
+        </div>
+        <div>
+          <label class="form-label mb-1" style="font-size:.8rem;">Hasta</label>
+          <input type="date" class="form-control form-control-sm" id="est-hasta" style="width:140px;">
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="cargarEstadisticas()">
+          <i class="bi bi-arrow-clockwise me-1"></i>Actualizar
+        </button>
+      </div>
+    </div>
+
+    <!-- KPIs globales -->
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-sm-3">
+        <div class="kpi-card">
+          <div class="kpi-icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-list-ul"></i></div>
+          <div><div class="kpi-num" id="est-total">—</div><div class="kpi-lbl">Total incidencias</div></div>
+        </div>
+      </div>
+      <div class="col-6 col-sm-3">
+        <div class="kpi-card">
+          <div class="kpi-icon bg-warning bg-opacity-10 text-warning"><i class="bi bi-hourglass-split"></i></div>
+          <div><div class="kpi-num" id="est-abiertas">—</div><div class="kpi-lbl">Abiertas</div></div>
+        </div>
+      </div>
+      <div class="col-6 col-sm-3">
+        <div class="kpi-card">
+          <div class="kpi-icon bg-success bg-opacity-10 text-success"><i class="bi bi-check2-circle"></i></div>
+          <div><div class="kpi-num" id="est-resueltas">—</div><div class="kpi-lbl">Resueltas</div></div>
+        </div>
+      </div>
+      <div class="col-6 col-sm-3">
+        <div class="kpi-card">
+          <div class="kpi-icon bg-danger bg-opacity-10 text-danger"><i class="bi bi-fire"></i></div>
+          <div><div class="kpi-num" id="est-criticas">—</div><div class="kpi-lbl">Críticas</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gráficos fila 1 -->
+    <div class="row g-3 mb-3">
+      <div class="col-md-5">
+        <div class="card border-0 shadow-sm h-100" style="border-radius:8px;">
+          <div class="card-header bg-transparent border-bottom py-2 fw-semibold small">Por área</div>
+          <div class="card-body"><div class="chart-wrap"><canvas id="chart-area"></canvas></div></div>
+        </div>
+      </div>
+      <div class="col-md-7">
+        <div class="card border-0 shadow-sm h-100" style="border-radius:8px;">
+          <div class="card-header bg-transparent border-bottom py-2 fw-semibold small">Por tipo de entrada</div>
+          <div class="card-body"><div class="chart-wrap"><canvas id="chart-tipo"></canvas></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gráficos fila 2 -->
+    <div class="row g-3 mb-3">
+      <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100" style="border-radius:8px;">
+          <div class="card-header bg-transparent border-bottom py-2 fw-semibold small">Estado de incidencias</div>
+          <div class="card-body"><div class="chart-wrap"><canvas id="chart-estado"></canvas></div></div>
+        </div>
+      </div>
+      <div class="col-md-8">
+        <div class="card border-0 shadow-sm h-100" style="border-radius:8px;">
+          <div class="card-header bg-transparent border-bottom py-2 fw-semibold small">Evolución mensual</div>
+          <div class="card-body"><div class="chart-wrap"><canvas id="chart-mensual"></canvas></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gráficos fila 3 -->
+    <div class="row g-3">
+      <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100" style="border-radius:8px;">
+          <div class="card-header bg-transparent border-bottom py-2 fw-semibold small">Medicamentos más mencionados</div>
+          <div class="card-body"><div class="chart-wrap"><canvas id="chart-meds"></canvas></div></div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100" style="border-radius:8px;">
+          <div class="card-header bg-transparent border-bottom py-2 fw-semibold small">Profesionales más activos</div>
+          <div class="card-body"><div class="chart-wrap"><canvas id="chart-prof"></canvas></div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div><!-- /main-content -->
+
+<!-- ╔══════════════════════════════════════════════════════╗
+     ║  MODAL — FORMULARIO DE PARTE                         ║
+     ╚══════════════════════════════════════════════════════╝ -->
+<div class="modal fade" id="modalParte" tabindex="-1" aria-labelledby="modalParteLbl" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalParteLbl">Parte de guardia</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="mp-id">
+        <div class="row g-3">
+          <div class="col-sm-6">
+            <label class="form-label">Fecha y hora de inicio <span class="text-danger">*</span></label>
+            <input type="datetime-local" class="form-control" id="mp-inicio">
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label">Fecha y hora de fin <span class="text-danger">*</span></label>
+            <input type="datetime-local" class="form-control" id="mp-fin">
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label">Tipo de periodo <span class="text-danger">*</span></label>
+            <select class="form-select" id="mp-tipo">
+              <option value="">— Selecciona —</option>
+            </select>
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label">Estado</label>
+            <select class="form-select" id="mp-estado">
+              <option value="borrador">Borrador</option>
+              <option value="cerrado">Cerrado</option>
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Profesionales de guardia</label>
+            <input type="text" class="form-control" id="mp-profesionales"
+                   placeholder="Ej: Ana García, Carlos Martínez">
+            <div class="form-text">Separados por comas.</div>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Observaciones generales del parte</label>
+            <textarea class="form-control" id="mp-observaciones" rows="3"
+                      placeholder="Resumen general del periodo, contexto, etc."></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-primary" onclick="guardarParte()">
+          <i class="bi bi-floppy me-1"></i>Guardar parte
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ╔══════════════════════════════════════════════════════╗
+     ║  MODAL — FORMULARIO DE INCIDENCIA                    ║
+     ╚══════════════════════════════════════════════════════╝ -->
+<div class="modal fade" id="modalIncidencia" tabindex="-1" aria-labelledby="modalIncLbl" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalIncLbl">Incidencia</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="mi-id">
+        <input type="hidden" id="mi-parte-id">
+
+        <!-- Aviso privacidad -->
+        <div class="privacy-notice mb-3">
+          <i class="bi bi-shield-exclamation me-1"></i>
+          No incluyas identificadores directos de pacientes (DNI, NHC, SIP…) en ningún campo.
+        </div>
+
+        <!-- Fila 1 -->
+        <div class="row g-3 mb-3">
+          <div class="col-sm-4">
+            <label class="form-label">Fecha y hora del evento <span class="text-danger">*</span></label>
+            <input type="datetime-local" class="form-control" id="mi-fecha-evento">
+          </div>
+          <div class="col-sm-4">
+            <label class="form-label">Área <span class="text-danger">*</span></label>
+            <select class="form-select" id="mi-area">
+              <option value="">— Selecciona —</option>
+            </select>
+          </div>
+          <div class="col-sm-4">
+            <label class="form-label">Tipo de entrada <span class="text-danger">*</span></label>
+            <select class="form-select" id="mi-tipo">
+              <option value="">— Selecciona —</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Fila 2 -->
+        <div class="row g-3 mb-3">
+          <div class="col-sm-6">
+            <label class="form-label">Servicio / Ubicación / Unidad</label>
+            <input type="text" class="form-control" id="mi-servicio" placeholder="Ej: UCI, Planta Cirugía 3ª">
+          </div>
+          <div class="col-sm-3">
+            <label class="form-label">Prioridad</label>
+            <select class="form-select" id="mi-prioridad">
+              <option value="baja">Baja</option>
+              <option value="media" selected>Media</option>
+              <option value="alta">Alta</option>
+              <option value="crítica">Crítica</option>
+            </select>
+          </div>
+          <div class="col-sm-3">
+            <label class="form-label">Estado</label>
+            <select class="form-select" id="mi-estado">
+              <option value="abierta">Abierta</option>
+              <option value="resuelta">Resuelta</option>
+              <option value="informativa">Informativa</option>
+              <option value="cerrada">Cerrada</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Descripción -->
+        <div class="mb-3">
+          <label class="form-label">Descripción de la incidencia <span class="text-danger">*</span></label>
+          <textarea class="form-control" id="mi-descripcion" rows="3"
+                    placeholder="Describe la incidencia. NO incluyas identificadores directos de pacientes."></textarea>
+        </div>
+
+        <!-- Actuación -->
+        <div class="mb-3">
+          <label class="form-label">Actuación / solución / respuesta</label>
+          <textarea class="form-control" id="mi-actuacion" rows="3"
+                    placeholder="Cómo se resolvió o qué medidas se tomaron."></textarea>
+        </div>
+
+        <!-- Fila medicamentos + etiquetas -->
+        <div class="row g-3 mb-3">
+          <div class="col-sm-6">
+            <label class="form-label">Medicamento(s) implicado(s)</label>
+            <input type="text" class="form-control" id="mi-medicamentos"
+                   placeholder="Ej: Metformina 850 mg, Insulina glargina">
+            <div class="form-text">Separados por comas si son varios.</div>
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label">Etiquetas / palabras clave</label>
+            <input type="text" class="form-control" id="mi-etiquetas"
+                   placeholder="Ej: urgente, dispensación, stock">
+            <div class="form-text">Separadas por comas.</div>
+          </div>
+        </div>
+
+        <!-- Seguimiento -->
+        <div class="mb-3">
+          <label class="form-label">Seguimiento posterior (si aplica)</label>
+          <textarea class="form-control" id="mi-seguimiento" rows="2"
+                    placeholder="Pendientes, acciones para el siguiente turno, etc."></textarea>
+        </div>
+
+        <!-- Avisos sensibilidad (se muestran tras validación) -->
+        <div id="mi-warnings" class="alert alert-warning small" style="display:none;"></div>
+
+        <!-- Adjuntos -->
+        <div id="mi-adjuntos-section">
+          <div class="form-section-title mt-2">Archivos adjuntos</div>
+          <div id="mi-adjuntos-lista" class="mb-2"></div>
+          <div class="d-flex gap-2 align-items-center flex-wrap">
+            <input type="file" class="form-control form-control-sm" id="mi-archivo"
+                   style="max-width:300px;" onchange="previsualizarArchivo(this)">
+            <button class="btn btn-outline-secondary btn-sm" id="btn-subir-adj"
+                    onclick="subirAdjunto()" style="display:none;">
+              <i class="bi bi-cloud-upload me-1"></i>Subir archivo
+            </button>
+            <span class="text-muted small">(máx. 5 MB por archivo)</span>
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <div class="text-muted small me-auto" id="mi-meta"></div>
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-primary" onclick="guardarIncidencia()">
+          <i class="bi bi-floppy me-1"></i>Guardar incidencia
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ╔══════════════════════════════════════════════════════╗
+     ║  MODAL — CONFIRMACIÓN GENÉRICA                       ║
+     ╚══════════════════════════════════════════════════════╝ -->
+<div class="modal fade" id="modalConfirm" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-sm modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header border-0 pb-0">
+        <h6 class="modal-title" id="confirm-title">Confirmar acción</h6>
+      </div>
+      <div class="modal-body pt-1">
+        <p class="mb-0" id="confirm-msg"></p>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-danger btn-sm" id="confirm-ok-btn">Confirmar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── SPINNER OVERLAY ────────────────────────────────── -->
+<div id="spinner-overlay">
+  <div class="text-center">
+    <div class="spinner-border text-primary" style="width:3rem;height:3rem;"></div>
+    <div class="mt-2 text-muted small" id="spinner-msg">Cargando…</div>
+  </div>
+</div>
+
+<!-- ── TOAST CONTAINER ───────────────────────────────── -->
+<div id="toast-container"></div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+'use strict';
+
+// ══════════════════════════════════════════════════════
+//  ESTADO GLOBAL
+// ══════════════════════════════════════════════════════
+var APP = {
+  user:            null,   // { email, nombre, rol }
+  catalogos:       null,   // { Area:[…], TipoEntrada:[…], … }
+  currentParteId:  null,
+  currentIncId:    null,
+  parteIncidencias:[],     // caché de incidencias del parte activo
+  bqPage:          1,
+  informeData:     null,
+  charts:          {},
+  histAllPartes:   [],     // caché lista partes
+  modalParteInst:  null,
+  modalIncInst:    null,
+  modalConfirmInst:null
+};
+
+// ══════════════════════════════════════════════════════
+//  UTILIDADES UI
+// ══════════════════════════════════════════════════════
+
+function showSpinner(msg) {
+  document.getElementById('spinner-msg').textContent = msg || 'Cargando…';
+  document.getElementById('spinner-overlay').classList.add('visible');
+}
+function hideSpinner() {
+  document.getElementById('spinner-overlay').classList.remove('visible');
+}
+
+function toast(msg, tipo) {
+  // tipo: 'success' | 'danger' | 'warning' | 'info'
+  var t = tipo || 'info';
+  var icons = { success:'check-circle-fill', danger:'x-circle-fill',
+                warning:'exclamation-triangle-fill', info:'info-circle-fill' };
+  var id = 'toast-' + Date.now();
+  var div = document.createElement('div');
+  div.id = id;
+  div.className = 'toast align-items-center text-bg-' + t + ' border-0 show mb-2';
+  div.setAttribute('role','alert');
+  div.innerHTML =
+    '<div class="d-flex">' +
+      '<div class="toast-body"><i class="bi bi-' + (icons[t]||'info-circle-fill') + ' me-2"></i>' + msg + '</div>' +
+      '<button type="button" class="btn-close btn-close-white me-2 m-auto" onclick="this.closest(\'.toast\').remove()"></button>' +
+    '</div>';
+  document.getElementById('toast-container').appendChild(div);
+  setTimeout(function() { var el = document.getElementById(id); if(el) el.remove(); }, 4500);
+}
+
+function confirmar(titulo, mensaje, callback) {
+  document.getElementById('confirm-title').textContent = titulo;
+  document.getElementById('confirm-msg').textContent   = mensaje;
+  var btn = document.getElementById('confirm-ok-btn');
+  btn.onclick = function() { APP.modalConfirmInst.hide(); callback(); };
+  APP.modalConfirmInst.show();
+}
+
+// ══════════════════════════════════════════════════════
+//  NAVEGACIÓN
+// ══════════════════════════════════════════════════════
+
+function showView(viewId) {
+  document.querySelectorAll('.view').forEach(function(el) {
+    el.classList.remove('active');
+  });
+  var target = document.getElementById('view-' + viewId);
+  if (target) target.classList.add('active');
+
+  document.querySelectorAll('.navbar-nav .nav-link').forEach(function(el) {
+    el.classList.remove('active');
+  });
+  var navEl = document.getElementById('nav-' + viewId);
+  if (navEl) navEl.classList.add('active');
+
+  // Lazy load por vista
+  if      (viewId === 'dashboard')    cargarDashboard();
+  else if (viewId === 'historico')    cargarHistorico();
+  else if (viewId === 'busqueda')     initBusqueda();
+  else if (viewId === 'informes')     initInformes();
+  else if (viewId === 'estadisticas') cargarEstadisticas();
+}
+
+// ══════════════════════════════════════════════════════
+//  HELPERS DE FORMATEO
+// ══════════════════════════════════════════════════════
+
+function fmtDT(iso) {
+  if (!iso) return '—';
+  var d = new Date(iso);
+  return d.toLocaleDateString('es-ES') + ' ' + d.toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' });
+}
+
+function fmtD(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('es-ES');
+}
+
+function badgeEstado(est) {
+  var map = {
+    borrador:'badge-estado-borrador', cerrado:'badge-estado-cerrado',
+    abierta:'badge-estado-abierta',   resuelta:'badge-estado-resuelta',
+    informativa:'badge-estado-informativa', cerrada:'badge-estado-cerrada'
+  };
+  return '<span class="badge ' + (map[est] || 'bg-secondary') + '">' + (est || '—') + '</span>';
+}
+
+function badgePrio(prio) {
+  var map = { baja:'badge-prio-baja', media:'badge-prio-media',
+              alta:'badge-prio-alta', 'crítica':'badge-prio-critica' };
+  return '<span class="badge ' + (map[prio] || 'bg-secondary') + '">' + (prio || '—') + '</span>';
+}
+
+function truncar(s, n) {
+  if (!s) return '—';
+  return s.length > n ? s.substring(0, n) + '…' : s;
+}
+
+function llenarSelect(selectId, opciones, valorActual) {
+  var sel = document.getElementById(selectId);
+  if (!sel) return;
+  var current = sel.value || valorActual || '';
+  // conserva primer option vacío
+  var first = sel.options[0] ? sel.options[0].outerHTML : '';
+  sel.innerHTML = first;
+  opciones.forEach(function(op) {
+    var opt = document.createElement('option');
+    opt.value = op; opt.textContent = op;
+    if (op === current) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+// ══════════════════════════════════════════════════════
+//  LLAMADAS AL SERVIDOR (wrapper con spinner)
+// ══════════════════════════════════════════════════════
+
+function llamar(fnName, args, spinnerMsg, onSuccess, onError) {
+  showSpinner(spinnerMsg || 'Procesando…');
+  var run = google.script.run
+    .withSuccessHandler(function(result) {
+      hideSpinner();
+      if (!result || !result.success) {
+        var msg = (result && result.message) || 'Error desconocido';
+        toast(msg, 'danger');
+        if (onError) onError(msg);
+      } else {
+        if (onSuccess) onSuccess(result.data, result.message);
+      }
+    })
+    .withFailureHandler(function(err) {
+      hideSpinner();
+      toast('Error del servidor: ' + (err.message || err), 'danger');
+      if (onError) onError(err);
+    });
+
+  // Despachar función con args
+  if (args && args.length) {
+    run[fnName].apply(run, args);
+  } else {
+    run[fnName]();
+  }
+}
+
+// ══════════════════════════════════════════════════════
+//  INICIALIZACIÓN
+// ══════════════════════════════════════════════════════
+
+window.addEventListener('load', function() {
+  // Instanciar modales Bootstrap
+  APP.modalParteInst   = new bootstrap.Modal(document.getElementById('modalParte'));
+  APP.modalIncInst     = new bootstrap.Modal(document.getElementById('modalIncidencia'));
+  APP.modalConfirmInst = new bootstrap.Modal(document.getElementById('modalConfirm'));
+
+  // Cargar usuario e info inicial
+  llamar('getCurrentUserInfo', [], 'Iniciando…', function(user) {
+    APP.user = user;
+    document.getElementById('user-name').textContent = user.nombre || user.email;
+    document.getElementById('user-rol').textContent  = user.rol;
+
+    llamar('getCatalogos', [], null, function(cat) {
+      APP.catalogos = cat;
+      poblarSelectoresCatalogos();
+      showView('dashboard');
+    });
+  });
+});
+
+function poblarSelectoresCatalogos() {
+  var cat = APP.catalogos || {};
+  var areas   = cat.Area        || [];
+  var tipos   = cat.TipoEntrada || [];
+  var tper    = cat.TipoPeriodo || [];
+
+  // Modal parte
+  llenarSelect('mp-tipo', tper);
+  // Modal incidencia
+  llenarSelect('mi-area', areas);
+  llenarSelect('mi-tipo', tipos);
+  // Búsqueda
+  llenarSelect('bq-area', areas);
+  llenarSelect('bq-tipo', tipos);
+  // Informes
+  llenarSelect('inf-area', areas);
+  llenarSelect('inf-tipo', tipos);
+  // Histórico
+  llenarSelect('hist-filtro-tipo', tper);
+  // Filtros vista parte
+  llenarSelect('inc-filtro-area', areas);
+}
+
+</script>
+<!-- FIN BLOQUE_SCRIPTS_1 -->
+<script>
+// ══════════════════════════════════════════════════════
+//  DASHBOARD
+// ══════════════════════════════════════════════════════
+
+function cargarDashboard() {
+  llamar('listPartes', [8], 'Cargando panel…', function(partes) {
+    renderDashPartes(partes);
+  });
+  llamar('getEstadisticas', [{}], null, function(est) {
+    document.getElementById('kpi-partes').textContent    = est.totalPartes;
+    document.getElementById('kpi-abiertas').textContent  = est.abiertas;
+    document.getElementById('kpi-criticas').textContent  = est.criticas;
+    document.getElementById('kpi-resueltas').textContent = est.resueltas;
+    renderDashIncidencias(est);
+  });
+}
+
+function renderDashPartes(partes) {
+  var tbody = document.getElementById('dash-partes-body');
+  if (!partes || partes.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No hay partes registrados aún.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = partes.map(function(p) {
+    return '<tr>' +
+      '<td><a href="#" onclick="abrirParte(\'' + p.id + '\')" class="fw-semibold text-decoration-none text-primary small">' + p.id + '</a></td>' +
+      '<td class="small">' + fmtD(p.fechaInicio) + ' – ' + fmtD(p.fechaFin) + '</td>' +
+      '<td class="small">' + (p.tipoPeriodo||'—') + '</td>' +
+      '<td class="small">' + truncar(p.profesionales, 35) + '</td>' +
+      '<td>' + badgeEstado(p.estado) + '</td>' +
+      '<td class="small text-muted">' + (p.creadoPor||'—') + '</td>' +
+      '<td><button class="btn btn-outline-primary btn-sm py-0" onclick="abrirParte(\'' + p.id + '\')"><i class="bi bi-eye"></i></button></td>' +
+    '</tr>';
+  }).join('');
+}
+
+function renderDashIncidencias(est) {
+  // Cargamos incidencias abiertas buscando con filtro estado=abierta
+  llamar('searchIncidencias', [{ estado:'abierta', pageSize:8, page:1 }], null, function(res) {
+    var tbody = document.getElementById('dash-incidencias-body');
+    var incs = res.resultados || [];
+    if (!incs.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">Sin incidencias abiertas. ✔</td></tr>';
+      return;
+    }
+    tbody.innerHTML = incs.map(function(i) {
+      return '<tr>' +
+        '<td class="small">' + fmtDT(i.fechaEvento) + '</td>' +
+        '<td class="small">' + (i.area||'—') + '</td>' +
+        '<td class="small">' + (i.tipoEntrada||'—') + '</td>' +
+        '<td class="small">' + truncar(i.descripcion, 60) + '</td>' +
+        '<td>' + badgePrio(i.prioridad) + '</td>' +
+        '<td>' + badgeEstado(i.estado) + '</td>' +
+        '<td><button class="btn btn-outline-secondary btn-sm py-0" onclick="abrirParte(\'' + i.idParte + '\')"><i class="bi bi-box-arrow-up-right"></i></button></td>' +
+      '</tr>';
+    }).join('');
+  });
+}
+
+// ══════════════════════════════════════════════════════
+//  HISTÓRICO
+// ══════════════════════════════════════════════════════
+
+function cargarHistorico() {
+  llamar('listPartes', [], 'Cargando histórico…', function(partes) {
+    APP.histAllPartes = partes || [];
+    filtrarHistorico();
+  });
+}
+
+function filtrarHistorico() {
+  var texto  = (document.getElementById('hist-filtro-texto').value  || '').toLowerCase();
+  var tipo   =  document.getElementById('hist-filtro-tipo').value   || '';
+  var estado =  document.getElementById('hist-filtro-estado').value || '';
+
+  var filtrados = APP.histAllPartes.filter(function(p) {
+    if (tipo   && p.tipoPeriodo !== tipo)   return false;
+    if (estado && p.estado      !== estado) return false;
+    if (texto) {
+      var haystack = [p.id, p.profesionales, p.creadoPor, p.observaciones].join(' ').toLowerCase();
+      if (haystack.indexOf(texto) === -1) return false;
+    }
+    return true;
+  });
+
+  var tbody = document.getElementById('hist-body');
+  document.getElementById('hist-count').textContent = filtrados.length + ' partes';
+
+  if (!filtrados.length) {
+    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3">Sin resultados con los filtros actuales.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = filtrados.map(function(p) {
+    var canEdit = (APP.user && (APP.user.rol === 'admin' || APP.user.rol === 'editor'));
+    var btnsCerrar = (p.estado === 'borrador' && canEdit)
+      ? '<button class="btn btn-outline-dark btn-sm py-0 me-1" onclick="confirmarCerrarParte(\'' + p.id + '\')" title="Cerrar"><i class="bi bi-lock"></i></button>'
+      : '';
+    return '<tr>' +
+      '<td><a href="#" onclick="abrirParte(\'' + p.id + '\')" class="text-primary fw-semibold text-decoration-none small">' + p.id + '</a></td>' +
+      '<td class="small">' + fmtDT(p.fechaInicio) + '</td>' +
+      '<td class="small">' + fmtDT(p.fechaFin)    + '</td>' +
+      '<td class="small">' + (p.tipoPeriodo||'—')  + '</td>' +
+      '<td class="small">' + truncar(p.profesionales, 30) + '</td>' +
+      '<td class="text-center">—</td>' +
+      '<td>' + badgeEstado(p.estado) + '</td>' +
+      '<td class="small text-muted">' + (p.creadoPor||'—') + '</td>' +
+      '<td class="text-end">' +
+        '<button class="btn btn-outline-primary btn-sm py-0 me-1" onclick="abrirParte(\'' + p.id + '\')" title="Ver"><i class="bi bi-eye"></i></button>' +
+        (canEdit ? '<button class="btn btn-outline-secondary btn-sm py-0 me-1" onclick="abrirModalParte(\'' + p.id + '\')" title="Editar"><i class="bi bi-pencil"></i></button>' : '') +
+        btnsCerrar +
+        (canEdit ? '<button class="btn btn-outline-secondary btn-sm py-0" onclick="confirmarDuplicar(\'' + p.id + '\')" title="Duplicar"><i class="bi bi-copy"></i></button>' : '') +
+      '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+function limpiarFiltrosHistorico() {
+  document.getElementById('hist-filtro-texto').value  = '';
+  document.getElementById('hist-filtro-tipo').value   = '';
+  document.getElementById('hist-filtro-estado').value = '';
+  filtrarHistorico();
+}
+
+// ══════════════════════════════════════════════════════
+//  DETALLE DE PARTE
+// ══════════════════════════════════════════════════════
+
+function abrirParte(id) {
+  APP.currentParteId = id;
+  APP.parteIncidencias = [];
+  showView('parte');
+  llamar('getParteConIncidencias', [id], 'Cargando parte…', function(data) {
+    var p = data.parte;
+    document.getElementById('parte-titulo').textContent = p.id;
+    document.getElementById('parte-periodo').textContent =
+      fmtDT(p.fechaInicio) + ' → ' + fmtDT(p.fechaFin);
+    document.getElementById('parte-tipo').textContent      = p.tipoPeriodo || '—';
+    document.getElementById('parte-estado').innerHTML      = badgeEstado(p.estado);
+    document.getElementById('parte-profesionales').textContent = p.profesionales || '(no indicados)';
+    document.getElementById('parte-observaciones').textContent = p.observaciones || '(sin observaciones)';
+    document.getElementById('parte-meta').textContent =
+      (p.creadoPor || '—') + ' · ' + fmtDT(p.fechaCreacion);
+
+    var canEdit = APP.user && (APP.user.rol==='admin' || APP.user.rol==='editor');
+    var cerrado = p.estado === 'cerrado';
+
+    document.getElementById('btn-editar-parte').style.display  = canEdit ? '' : 'none';
+    document.getElementById('btn-cerrar-parte').style.display  = (canEdit && !cerrado) ? '' : 'none';
+    document.getElementById('btn-nueva-incidencia').style.display = canEdit ? '' : 'none';
+
+    APP.parteIncidencias = data.incidencias || [];
+    renderIncidencias();
+  });
+}
+
+function renderIncidencias() {
+  var areaF  = document.getElementById('inc-filtro-area').value  || '';
+  var prioF  = document.getElementById('inc-filtro-prio').value  || '';
+  var estF   = document.getElementById('inc-filtro-estado').value|| '';
+  var canEdit = APP.user && (APP.user.rol==='admin' || APP.user.rol==='editor');
+
+  var lista = APP.parteIncidencias.filter(function(i) {
+    if (areaF && i.area     !== areaF) return false;
+    if (prioF && i.prioridad!== prioF) return false;
+    if (estF  && i.estado   !== estF)  return false;
+    return true;
+  });
+
+  document.getElementById('inc-count-badge').textContent = APP.parteIncidencias.length;
+  var cont = document.getElementById('incidencias-container');
+
+  if (!lista.length) {
+    cont.innerHTML = '<div class="text-center text-muted py-4">No hay incidencias que coincidan con los filtros.</div>';
+    return;
+  }
+
+  cont.innerHTML = lista.map(function(inc) {
+    var prioClass = 'prio-' + (inc.prioridad||'media').replace('í','i');
+    var btns = canEdit
+      ? '<button class="btn btn-outline-secondary btn-sm py-0 me-1" onclick="abrirModalIncidencia(\'' + inc.id + '\')" title="Editar"><i class="bi bi-pencil"></i></button>'
+      : '';
+
+    return '<div class="inc-card ' + prioClass + '">' +
+      '<div class="d-flex align-items-start gap-2 flex-wrap">' +
+        '<div class="flex-grow-1">' +
+          '<div class="d-flex gap-2 mb-1 flex-wrap">' +
+            '<span class="text-muted small"><i class="bi bi-clock me-1"></i>' + fmtDT(inc.fechaEvento) + '</span>' +
+            '<span class="badge bg-light text-dark border small">' + (inc.area||'—') + '</span>' +
+            '<span class="badge bg-light text-dark border small">' + (inc.tipoEntrada||'—') + '</span>' +
+            badgePrio(inc.prioridad) + ' ' + badgeEstado(inc.estado) +
+          '</div>' +
+          '<p class="mb-1 small fw-semibold">' + escHtml(inc.descripcion||'—') + '</p>' +
+          (inc.actuacion ? '<p class="mb-1 small text-muted"><i class="bi bi-arrow-return-right me-1"></i>' + escHtml(truncar(inc.actuacion, 200)) + '</p>' : '') +
+          (inc.medicamentos ? '<p class="mb-1 small"><i class="bi bi-capsule me-1 text-secondary"></i>' + escHtml(inc.medicamentos) + '</p>' : '') +
+          (inc.servicio ? '<p class="mb-0 small text-muted"><i class="bi bi-building me-1"></i>' + escHtml(inc.servicio) + '</p>' : '') +
+          (inc.seguimiento ? '<p class="mb-0 small text-warning-emphasis"><i class="bi bi-arrow-right-circle me-1"></i>' + escHtml(truncar(inc.seguimiento,150)) + '</p>' : '') +
+        '</div>' +
+        '<div class="d-flex flex-column align-items-end gap-1">' +
+          btns +
+          '<span class="text-muted" style="font-size:.72rem;">' + (inc.registradoPor||'—') + '</span>' +
+          (inc.tieneAdjuntos ? '<span class="small text-secondary"><i class="bi bi-paperclip"></i> adj.</span>' : '') +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function escHtml(s) {
+  if (!s) return '';
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function cerrarParte() {
+  confirmar('Cerrar parte', '¿Cerrar este parte? No podrá ser editado por usuarios no administradores.', function() {
+    llamar('closeParte', [APP.currentParteId], 'Cerrando…', function() {
+      toast('Parte cerrado correctamente.', 'success');
+      abrirParte(APP.currentParteId);
+    });
+  });
+}
+
+function duplicarParte() {
+  confirmar('Duplicar parte', '¿Crear un nuevo parte copiando los datos de éste?', function() {
+    llamar('duplicateParte', [APP.currentParteId], 'Duplicando…', function(data) {
+      toast('Parte duplicado: ' + data.id, 'success');
+      abrirParte(data.id);
+    });
+  });
+}
+
+function confirmarCerrarParte(id) {
+  confirmar('Cerrar parte', '¿Cerrar el parte ' + id + '?', function() {
+    llamar('closeParte', [id], 'Cerrando…', function() {
+      toast('Parte ' + id + ' cerrado.', 'success');
+      cargarHistorico();
+    });
+  });
+}
+
+function confirmarDuplicar(id) {
+  confirmar('Duplicar parte', '¿Crear un nuevo parte copiando ' + id + '?', function() {
+    llamar('duplicateParte', [id], 'Duplicando…', function(data) {
+      toast('Parte duplicado: ' + data.id, 'success');
+      abrirParte(data.id);
+    });
+  });
+}
+
+</script>
+<!-- FIN BLOQUE_SCRIPTS_2 -->
+<script>
+// ══════════════════════════════════════════════════════
+//  MODAL PARTE — abrir / guardar
+// ══════════════════════════════════════════════════════
+
+function abrirModalParte(id) {
+  // Limpiar formulario
+  ['mp-id','mp-inicio','mp-fin','mp-profesionales','mp-observaciones'].forEach(function(fId) {
+    document.getElementById(fId).value = '';
+  });
+  document.getElementById('mp-tipo').value   = '';
+  document.getElementById('mp-estado').value = 'borrador';
+  document.getElementById('modalParteLbl').textContent = id ? 'Editar parte' : 'Nuevo parte de guardia';
+
+  if (id) {
+    llamar('getParte', [id], 'Cargando parte…', function(p) {
+      document.getElementById('mp-id').value = p.id;
+
+      var toLocal = function(iso) {
+        if (!iso) return '';
+        var d = new Date(iso);
+        var pad = function(n){ return n<10?'0'+n:n; };
+        return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()) +
+               'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+      };
+
+      document.getElementById('mp-inicio').value       = toLocal(p.fechaInicio);
+      document.getElementById('mp-fin').value          = toLocal(p.fechaFin);
+      document.getElementById('mp-tipo').value         = p.tipoPeriodo   || '';
+      document.getElementById('mp-estado').value       = p.estado        || 'borrador';
+      document.getElementById('mp-profesionales').value= p.profesionales || '';
+      document.getElementById('mp-observaciones').value= p.observaciones || '';
+      APP.modalParteInst.show();
+    });
+  } else {
+    // Prefill con fechas del fin de semana próximo/actual
+    var ahora = new Date();
+    var toLocal = function(d) {
+      var pad = function(n){ return n<10?'0'+n:n; };
+      return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()) +
+             'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+    };
+    document.getElementById('mp-inicio').value = toLocal(ahora);
+    APP.modalParteInst.show();
+  }
+}
+
+function guardarParte() {
+  var id     = document.getElementById('mp-id').value.trim();
+  var inicio = document.getElementById('mp-inicio').value;
+  var fin    = document.getElementById('mp-fin').value;
+  var tipo   = document.getElementById('mp-tipo').value;
+  var estado = document.getElementById('mp-estado').value;
+  var profs  = document.getElementById('mp-profesionales').value.trim();
+  var obs    = document.getElementById('mp-observaciones').value.trim();
+
+  if (!inicio) { toast('La fecha de inicio es obligatoria.', 'warning'); return; }
+  if (!fin)    { toast('La fecha de fin es obligatoria.',    'warning'); return; }
+  if (!tipo)   { toast('Selecciona el tipo de periodo.',     'warning'); return; }
+
+  var data = {
+    fechaInicio: new Date(inicio).toISOString(),
+    fechaFin:    new Date(fin).toISOString(),
+    tipoPeriodo: tipo, estado: estado,
+    profesionales: profs, observaciones: obs
+  };
+
+  if (id) {
+    llamar('updateParte', [id, data], 'Guardando…', function(res, msg) {
+      APP.modalParteInst.hide();
+      toast(msg || 'Parte actualizado.', 'success');
+      if (APP.currentParteId === id) abrirParte(id);
+      else cargarHistorico();
+    });
+  } else {
+    llamar('createParte', [data], 'Creando parte…', function(res, msg) {
+      APP.modalParteInst.hide();
+      toast(msg || 'Parte creado.', 'success');
+      abrirParte(res.id);
+    });
+  }
+}
+
+// ══════════════════════════════════════════════════════
+//  MODAL INCIDENCIA — abrir / guardar
+// ══════════════════════════════════════════════════════
+
+function abrirModalIncidencia(incId) {
+  // Limpiar
+  ['mi-id','mi-parte-id','mi-fecha-evento','mi-servicio','mi-descripcion',
+   'mi-actuacion','mi-medicamentos','mi-etiquetas','mi-seguimiento'].forEach(function(fId) {
+    document.getElementById(fId).value = '';
+  });
+  document.getElementById('mi-area').value     = '';
+  document.getElementById('mi-tipo').value     = '';
+  document.getElementById('mi-prioridad').value= 'media';
+  document.getElementById('mi-estado').value   = 'abierta';
+  document.getElementById('mi-warnings').style.display = 'none';
+  document.getElementById('mi-meta').textContent = '';
+  document.getElementById('mi-adjuntos-lista').innerHTML = '';
+  document.getElementById('mi-archivo').value   = '';
+  document.getElementById('btn-subir-adj').style.display = 'none';
+
+  if (incId) {
+    // Editar incidencia existente
+    APP.currentIncId = incId;
+    document.getElementById('modalIncLbl').textContent = 'Editar incidencia';
+    llamar('getIncidencia', [incId], 'Cargando incidencia…', function(inc) {
+      document.getElementById('mi-id').value      = inc.id;
+      document.getElementById('mi-parte-id').value= inc.idParte;
+
+      var toLocal = function(iso) {
+        if (!iso) return '';
+        var d   = new Date(iso);
+        var pad = function(n){ return n<10?'0'+n:''+n; };
+        return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+
+               'T'+pad(d.getHours())+':'+pad(d.getMinutes());
+      };
+
+      document.getElementById('mi-fecha-evento').value = toLocal(inc.fechaEvento);
+      document.getElementById('mi-area').value         = inc.area       || '';
+      document.getElementById('mi-tipo').value         = inc.tipoEntrada|| '';
+      document.getElementById('mi-servicio').value     = inc.servicio   || '';
+      document.getElementById('mi-prioridad').value    = inc.prioridad  || 'media';
+      document.getElementById('mi-estado').value       = inc.estado     || 'abierta';
+      document.getElementById('mi-descripcion').value  = inc.descripcion|| '';
+      document.getElementById('mi-actuacion').value    = inc.actuacion  || '';
+      document.getElementById('mi-medicamentos').value = inc.medicamentos||'';
+      document.getElementById('mi-etiquetas').value    = inc.etiquetas  || '';
+      document.getElementById('mi-seguimiento').value  = inc.seguimiento|| '';
+      document.getElementById('mi-meta').textContent   =
+        'Registrado por ' + (inc.registradoPor||'—') + ' · ' + fmtDT(inc.fechaRegistro);
+
+      cargarAdjuntosModal(inc.id);
+      APP.modalIncInst.show();
+    });
+  } else {
+    // Nueva incidencia
+    APP.currentIncId = null;
+    document.getElementById('modalIncLbl').textContent  = 'Nueva incidencia';
+    document.getElementById('mi-parte-id').value = APP.currentParteId || '';
+
+    var ahora = new Date();
+    var pad   = function(n){ return n<10?'0'+n:''+n; };
+    document.getElementById('mi-fecha-evento').value =
+      ahora.getFullYear()+'-'+pad(ahora.getMonth()+1)+'-'+pad(ahora.getDate())+
+      'T'+pad(ahora.getHours())+':'+pad(ahora.getMinutes());
+
+    APP.modalIncInst.show();
+  }
+}
+
+function guardarIncidencia() {
+  var id      = document.getElementById('mi-id').value.trim();
+  var parteId = document.getElementById('mi-parte-id').value.trim();
+  var fechaEv = document.getElementById('mi-fecha-evento').value;
+  var area    = document.getElementById('mi-area').value;
+  var tipo    = document.getElementById('mi-tipo').value;
+  var desc    = document.getElementById('mi-descripcion').value.trim();
+  var act     = document.getElementById('mi-actuacion').value.trim();
+  var meds    = document.getElementById('mi-medicamentos').value.trim();
+  var serv    = document.getElementById('mi-servicio').value.trim();
+  var prio    = document.getElementById('mi-prioridad').value;
+  var estado  = document.getElementById('mi-estado').value;
+  var etiq    = document.getElementById('mi-etiquetas').value.trim();
+  var seg     = document.getElementById('mi-seguimiento').value.trim();
+
+  if (!area) { toast('Selecciona el área.', 'warning'); return; }
+  if (!tipo) { toast('Selecciona el tipo de entrada.', 'warning'); return; }
+  if (!desc) { toast('La descripción es obligatoria.', 'warning'); return; }
+
+  var data = {
+    idParte:     parteId,
+    fechaEvento: fechaEv ? new Date(fechaEv).toISOString() : new Date().toISOString(),
+    area: area, tipoEntrada: tipo, descripcion: desc,
+    actuacion: act, medicamentos: meds, servicio: serv,
+    prioridad: prio, estado: estado, etiquetas: etiq, seguimiento: seg
+  };
+
+  var onDone = function(res, msg) {
+    APP.modalIncInst.hide();
+    // Mostrar avisos de privacidad si los hay
+    if (res && res.warnings && res.warnings.length) {
+      res.warnings.forEach(function(w) { toast(w, 'warning'); });
+    }
+    toast(msg || 'Incidencia guardada.', 'success');
+    if (APP.currentParteId) abrirParte(APP.currentParteId);
+  };
+
+  if (id) {
+    llamar('updateIncidencia', [id, data], 'Guardando…', onDone);
+  } else {
+    llamar('createIncidencia', [data], 'Registrando incidencia…', onDone);
+  }
+}
+
+// ══════════════════════════════════════════════════════
+//  ADJUNTOS
+// ══════════════════════════════════════════════════════
+
+function cargarAdjuntosModal(incId) {
+  llamar('getAdjuntosByIncidencia', [incId], null, function(adjs) {
+    var cont = document.getElementById('mi-adjuntos-lista');
+    if (!adjs || !adjs.length) { cont.innerHTML = '<p class="text-muted small mb-1">Sin adjuntos.</p>'; return; }
+    cont.innerHTML = adjs.map(function(a) {
+      return '<div class="adj-item mb-1">' +
+        '<i class="bi bi-paperclip text-muted"></i>' +
+        '<a href="' + a.url + '" target="_blank">' + escHtml(a.nombre) + '</a>' +
+        '<span class="text-muted ms-1">(' + (a.tamanyoLegible||'') + ')</span>' +
+        '<button class="btn btn-outline-danger btn-sm py-0 ms-auto" onclick="eliminarAdjunto(\'' + a.id + '\')">' +
+          '<i class="bi bi-trash3"></i></button>' +
+      '</div>';
+    }).join('');
+  });
+}
+
+function previsualizarArchivo(input) {
+  document.getElementById('btn-subir-adj').style.display = input.files.length ? '' : 'none';
+}
+
+function subirAdjunto() {
+  var incId   = document.getElementById('mi-id').value.trim();
+  var parteId = document.getElementById('mi-parte-id').value.trim();
+  var input   = document.getElementById('mi-archivo');
+
+  if (!incId) { toast('Guarda la incidencia primero antes de adjuntar archivos.', 'warning'); return; }
+  if (!input.files.length) return;
+
+  var file   = input.files[0];
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var b64 = e.target.result.split(',')[1];
+    llamar('uploadAdjunto', [incId, parteId, file.name, b64, file.type],
+      'Subiendo archivo…', function(res, msg) {
+        toast(msg || 'Archivo subido.', 'success');
+        input.value = '';
+        document.getElementById('btn-subir-adj').style.display = 'none';
+        cargarAdjuntosModal(incId);
+      });
+  };
+  reader.readAsDataURL(file);
+}
+
+function eliminarAdjunto(adjId) {
+  confirmar('Eliminar adjunto', '¿Eliminar este adjunto? También se moverá a la papelera de Drive.', function() {
+    var incId = document.getElementById('mi-id').value.trim();
+    llamar('deleteAdjunto', [adjId], 'Eliminando…', function(_, msg) {
+      toast(msg || 'Adjunto eliminado.', 'success');
+      if (incId) cargarAdjuntosModal(incId);
+    });
+  });
+}
+
+</script>
+<!-- FIN BLOQUE_SCRIPTS_3 -->
+<script>
+// ══════════════════════════════════════════════════════
+//  BÚSQUEDA
+// ══════════════════════════════════════════════════════
+
+function initBusqueda() {
+  // Llenar selector de partes (solo primera vez)
+  if (document.getElementById('bq-parte').options.length <= 1) {
+    llamar('getPartesParaSelector', [], null, function(lista) {
+      var sel = document.getElementById('bq-parte');
+      lista.forEach(function(p) {
+        var opt = document.createElement('option');
+        opt.value = p.id; opt.textContent = p.label;
+        sel.appendChild(opt);
+      });
+    });
+  }
+}
+
+function limpiarBusqueda() {
+  ['bq-texto','bq-desde','bq-hasta','bq-medicamento','bq-servicio','bq-registrado'].forEach(function(id) {
+    document.getElementById(id).value = '';
+  });
+  ['bq-parte','bq-area','bq-tipo','bq-prioridad','bq-estado','bq-adjuntos'].forEach(function(id) {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('bq-resultados').style.display = 'none';
+}
+
+function buscar(page) {
+  page = page || 1;
+  APP.bqPage = page;
+
+  var filtros = {
+    texto:         document.getElementById('bq-texto').value.trim()       || undefined,
+    fechaDesde:    document.getElementById('bq-desde').value              || undefined,
+    fechaHasta:    document.getElementById('bq-hasta').value              || undefined,
+    idParte:       document.getElementById('bq-parte').value              || undefined,
+    area:          document.getElementById('bq-area').value               || undefined,
+    tipoEntrada:   document.getElementById('bq-tipo').value               || undefined,
+    medicamento:   document.getElementById('bq-medicamento').value.trim() || undefined,
+    servicio:      document.getElementById('bq-servicio').value.trim()    || undefined,
+    prioridad:     document.getElementById('bq-prioridad').value          || undefined,
+    estado:        document.getElementById('bq-estado').value             || undefined,
+    registradoPor: document.getElementById('bq-registrado').value.trim()  || undefined,
+    conAdjuntos:   document.getElementById('bq-adjuntos').value === 'si' ? true : undefined,
+    page: page, pageSize: 25
+  };
+
+  // Limpiar undefined
+  Object.keys(filtros).forEach(function(k) { if (filtros[k] === undefined) delete filtros[k]; });
+
+  llamar('searchIncidencias', [filtros], 'Buscando…', function(res) {
+    document.getElementById('bq-resultados').style.display = '';
+    document.getElementById('bq-total-label').textContent =
+      res.total + ' resultado' + (res.total !== 1 ? 's' : '') +
+      ' · página ' + res.pagina + ' de ' + res.totalPaginas;
+
+    var tbody = document.getElementById('bq-body');
+    var incs  = res.resultados || [];
+    if (!incs.length) {
+      tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3">Sin resultados.</td></tr>';
+    } else {
+      tbody.innerHTML = incs.map(function(i) {
+        return '<tr>' +
+          '<td class="small">' + fmtDT(i.fechaEvento)             + '</td>' +
+          '<td class="small">' + (i.area||'—')                    + '</td>' +
+          '<td class="small">' + (i.tipoEntrada||'—')             + '</td>' +
+          '<td class="small">' + truncar(i.descripcion, 70)       + '</td>' +
+          '<td class="small">' + truncar(i.medicamentos, 40)      + '</td>' +
+          '<td>'               + badgePrio(i.prioridad)           + '</td>' +
+          '<td>'               + badgeEstado(i.estado)            + '</td>' +
+          '<td class="small"><a href="#" class="text-primary text-decoration-none" onclick="abrirParte(\'' + i.idParte + '\')">' + i.idParte + '</a></td>' +
+          '<td><button class="btn btn-outline-secondary btn-sm py-0" onclick="abrirParte(\'' + i.idParte + '\')" title="Ver parte"><i class="bi bi-box-arrow-up-right"></i></button></td>' +
+        '</tr>';
+      }).join('');
+    }
+
+    document.getElementById('bq-prev').disabled = (page <= 1);
+    document.getElementById('bq-next').disabled = (page >= res.totalPaginas);
+    document.getElementById('bq-page-info').textContent =
+      'Página ' + res.pagina + ' / ' + res.totalPaginas;
+  });
+}
+
+// ══════════════════════════════════════════════════════
+//  INFORMES
+// ══════════════════════════════════════════════════════
+
+function initInformes() {
+  // Poner fechas por defecto (último mes)
+  if (!document.getElementById('inf-desde').value) {
+    var hasta = new Date();
+    var desde = new Date();
+    desde.setMonth(desde.getMonth() - 1);
+    var fmt = function(d){ return d.toISOString().substr(0,10); };
+    document.getElementById('inf-desde').value = fmt(desde);
+    document.getElementById('inf-hasta').value = fmt(hasta);
+  }
+}
+
+function limpiarInforme() {
+  document.getElementById('inf-desde').value      = '';
+  document.getElementById('inf-hasta').value      = '';
+  document.getElementById('inf-area').value       = '';
+  document.getElementById('inf-tipo').value       = '';
+  document.getElementById('inf-prioridad').value  = '';
+  document.getElementById('inf-medicamento').value= '';
+  document.getElementById('inf-resultado').style.display = 'none';
+  APP.informeData = null;
+}
+
+function generarInforme() {
+  var desde = document.getElementById('inf-desde').value;
+  var hasta = document.getElementById('inf-hasta').value;
+  if (!desde || !hasta) { toast('Selecciona las fechas de inicio y fin.', 'warning'); return; }
+
+  var params = {
+    fechaDesde:  desde,
+    fechaHasta:  hasta,
+    area:        document.getElementById('inf-area').value       || undefined,
+    tipoEntrada: document.getElementById('inf-tipo').value       || undefined,
+    prioridad:   document.getElementById('inf-prioridad').value  || undefined,
+    medicamento: document.getElementById('inf-medicamento').value.trim() || undefined
+  };
+  Object.keys(params).forEach(function(k){ if(!params[k]) delete params[k]; });
+
+  llamar('generateInforme', [params], 'Generando informe…', function(data) {
+    APP.informeData = data;
+    document.getElementById('inf-resultado').style.display = '';
+
+    document.getElementById('inf-kpi-partes').textContent = data.totalPartes;
+    document.getElementById('inf-kpi-total').textContent  = data.totalIncidencias;
+
+    // Desglose por área
+    var ulArea = document.getElementById('inf-por-area');
+    ulArea.innerHTML = Object.keys(data.porArea).map(function(k) {
+      return '<li><span class="fw-semibold">' + data.porArea[k] + '</span> ' + k + '</li>';
+    }).join('') || '<li class="text-muted">—</li>';
+
+    // Desglose por tipo
+    var ulTipo = document.getElementById('inf-por-tipo');
+    ulTipo.innerHTML = Object.keys(data.porTipo).map(function(k) {
+      return '<li><span class="fw-semibold">' + data.porTipo[k] + '</span> ' + k + '</li>';
+    }).join('') || '<li class="text-muted">—</li>';
+
+    // Tabla listado
+    var tbody = document.getElementById('inf-tabla-body');
+    tbody.innerHTML = data.incidencias.map(function(i) {
+      return '<tr>' +
+        '<td class="small">' + fmtDT(i.fechaEvento)         + '</td>' +
+        '<td class="small">' + (i.area||'—')                + '</td>' +
+        '<td class="small">' + (i.tipoEntrada||'—')         + '</td>' +
+        '<td class="small">' + truncar(i.descripcion, 80)   + '</td>' +
+        '<td class="small">' + truncar(i.actuacion, 60)     + '</td>' +
+        '<td class="small">' + truncar(i.medicamentos, 40)  + '</td>' +
+        '<td class="small">' + truncar(i.servicio, 40)      + '</td>' +
+        '<td>'               + badgePrio(i.prioridad)       + '</td>' +
+        '<td>'               + badgeEstado(i.estado)        + '</td>' +
+        '<td class="small">' + (i.registradoPor||'—')       + '</td>' +
+        '<td class="small"><a href="#" class="text-primary text-decoration-none" onclick="abrirParte(\'' + i.idParte + '\')">' + i.idParte + '</a></td>' +
+      '</tr>';
+    }).join('') || '<tr><td colspan="11" class="text-center text-muted py-3">Sin incidencias en el periodo.</td></tr>';
+  });
+}
+
+function exportarCSV() {
+  var desde = document.getElementById('inf-desde').value;
+  var hasta = document.getElementById('inf-hasta').value;
+  if (!desde || !hasta) { toast('Genera el informe primero.', 'warning'); return; }
+
+  var params = {
+    fechaDesde:  desde, fechaHasta: hasta,
+    area:        document.getElementById('inf-area').value       || undefined,
+    tipoEntrada: document.getElementById('inf-tipo').value       || undefined,
+    prioridad:   document.getElementById('inf-prioridad').value  || undefined,
+    medicamento: document.getElementById('inf-medicamento').value.trim() || undefined
+  };
+  Object.keys(params).forEach(function(k){ if(!params[k]) delete params[k]; });
+
+  llamar('exportInformeCSV', [params], 'Preparando CSV…', function(res) {
+    var blob = new Blob([res.csv], { type: 'text/csv;charset=utf-8;' });
+    var url  = URL.createObjectURL(blob);
+    var a    = document.createElement('a');
+    a.href   = url;
+    a.download = 'informe_guardias_' + desde + '_' + hasta + '.csv';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+}
+
+function exportarPDF() {
+  var desde = document.getElementById('inf-desde').value;
+  var hasta = document.getElementById('inf-hasta').value;
+  if (!desde || !hasta) { toast('Genera el informe primero.', 'warning'); return; }
+
+  var params = {
+    fechaDesde: desde, fechaHasta: hasta,
+    area:       document.getElementById('inf-area').value      || undefined,
+    tipoEntrada:document.getElementById('inf-tipo').value      || undefined,
+    prioridad:  document.getElementById('inf-prioridad').value || undefined,
+    medicamento:document.getElementById('inf-medicamento').value.trim() || undefined
+  };
+  Object.keys(params).forEach(function(k){ if(!params[k]) delete params[k]; });
+
+  llamar('getInformeHTML', [params], 'Preparando PDF…', function(res) {
+    var win = window.open('', '_blank');
+    win.document.write(res.html);
+    win.document.close();
+    setTimeout(function() { win.print(); }, 600);
+  });
+}
+
+// ══════════════════════════════════════════════════════
+//  ESTADÍSTICAS
+// ══════════════════════════════════════════════════════
+
+function cargarEstadisticas() {
+  var params = {
+    fechaDesde: document.getElementById('est-desde').value || undefined,
+    fechaHasta: document.getElementById('est-hasta').value || undefined
+  };
+  Object.keys(params).forEach(function(k){ if(!params[k]) delete params[k]; });
+
+  llamar('getEstadisticas', [params], 'Calculando estadísticas…', function(est) {
+    document.getElementById('est-total').textContent    = est.total;
+    document.getElementById('est-abiertas').textContent = est.abiertas;
+    document.getElementById('est-resueltas').textContent= est.resueltas;
+    document.getElementById('est-criticas').textContent = est.criticas;
+
+    renderChart('chart-area',    'doughnut', est.porArea,    PALETA_SUAVE);
+    renderChart('chart-tipo',    'bar',      est.porTipo,    PALETA_AZUL);
+    renderChart('chart-estado',  'doughnut', est.porEstado,  PALETA_ESTADO);
+
+    renderChartArray('chart-meds',  'bar', est.medicamentosFrecuentes,  '#1a73e8');
+    renderChartArray('chart-prof',  'bar', est.profesionalesMasActivos, '#34a853');
+    renderChartArray('chart-mensual','line', est.evolucionMensual,       '#1a73e8');
+  });
+}
+
+var PALETA_SUAVE  = ['#4285f4','#34a853','#fbbc04','#ea4335','#9c27b0','#00acc1','#ff7043','#8d6e63'];
+var PALETA_AZUL   = ['#1a73e8','#2196f3','#42a5f5','#64b5f6','#90caf9','#bbdefb','#e3f2fd','#81d4fa','#4fc3f7','#29b6f6','#039be5'];
+var PALETA_ESTADO = ['#fbbc04','#34a853','#4285f4','#ea4335'];
+
+function renderChart(canvasId, tipo, objetoData, colores) {
+  var etiquetas = Object.keys(objetoData);
+  var valores   = etiquetas.map(function(k){ return objetoData[k]; });
+  renderChartRaw(canvasId, tipo, etiquetas, valores, colores);
+}
+
+function renderChartArray(canvasId, tipo, arrayData, color) {
+  var etiquetas = arrayData.map(function(d){ return d.etiqueta; });
+  var valores   = arrayData.map(function(d){ return d.valor; });
+  renderChartRaw(canvasId, tipo, etiquetas, valores, color);
+}
+
+function renderChartRaw(canvasId, tipo, etiquetas, valores, colores) {
+  var canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+
+  if (APP.charts[canvasId]) { APP.charts[canvasId].destroy(); }
+
+  var bgColor = Array.isArray(colores) ? colores : valores.map(function(){ return colores; });
+
+  APP.charts[canvasId] = new Chart(canvas.getContext('2d'), {
+    type: tipo,
+    data: {
+      labels: etiquetas,
+      datasets: [{
+        data: valores,
+        backgroundColor: bgColor,
+        borderColor:     tipo === 'line' ? colores : undefined,
+        borderWidth:     tipo === 'line' ? 2 : 0,
+        fill:            tipo === 'line' ? false : undefined,
+        tension:         tipo === 'line' ? 0.3 : undefined,
+        pointRadius:     tipo === 'line' ? 3 : undefined
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: tipo === 'doughnut' ? 'right' : 'top',
+                  labels: { font: { size: 11 }, boxWidth: 12 } }
+      },
+      scales: tipo !== 'doughnut' ? {
+        x: { ticks: { font: { size: 10 }, maxRotation: 40 } },
+        y: { beginAtZero: true, ticks: { font: { size: 10 } } }
+      } : {}
+    }
+  });
+}
+
+</script>
+<!-- FIN BLOQUE_SCRIPTS_4 -->
+
+</body>
+</html>
