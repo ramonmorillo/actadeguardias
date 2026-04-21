@@ -489,7 +489,7 @@
       <span class="fw-semibold">Incidencias <span class="badge bg-secondary ms-1" id="inc-count-badge">0</span></span>
       <button class="btn btn-primary btn-sm ms-auto" id="btn-nueva-incidencia"
               onclick="abrirModalIncidencia(null)">
-        <i class="bi bi-plus-lg me-1"></i>Añadir incidencia
+        <i class="bi bi-plus-lg me-1"></i>Nueva incidencia
       </button>
     </div>
 
@@ -1531,7 +1531,9 @@ function llamar(fnName, args, spinnerMsg, onSuccess, onError) {
     .withSuccessHandler(function(result) {
       hideSpinner();
       if (!result || !result.success) {
-        var msg = (result && result.message) || 'Error desconocido';
+        var msg = (result && result.message)
+          ? result.message
+          : ('Error al ejecutar "' + fnName + '".');
         var low = msg.toLowerCase();
         if (low.indexOf('sesión') !== -1 &&
             (low.indexOf('expirada') !== -1 || low.indexOf('no válida') !== -1 || low.indexOf('no hay sesión') !== -1)) {
@@ -1549,7 +1551,8 @@ function llamar(fnName, args, spinnerMsg, onSuccess, onError) {
     })
     .withFailureHandler(function(err) {
       hideSpinner();
-      toast('Error del servidor: ' + (err.message || err), 'danger');
+      var msg = (err && (err.message || err.toString && err.toString())) || 'Fallo inesperado';
+      toast('Error del servidor en "' + fnName + '": ' + msg, 'danger');
       if (onError) onError(err);
     });
 
@@ -2243,6 +2246,10 @@ function abrirModalIncidencia(incId) {
     });
   } else {
     // Nueva incidencia: mostrar nota informativa sobre adjuntos
+    if (!APP.currentParteId) {
+      toast('Debes abrir primero el detalle de un parte para registrar incidencias.', 'warning');
+      return;
+    }
     APP.currentIncId = null;
     document.getElementById('modalIncLbl').textContent  = 'Nueva incidencia';
     document.getElementById('mi-parte-id').value = APP.currentParteId || '';
@@ -2274,6 +2281,7 @@ function guardarIncidencia() {
   var etiq    = document.getElementById('mi-etiquetas').value.trim();
   var seg     = document.getElementById('mi-seguimiento').value.trim();
 
+  if (!parteId) { toast('No se ha encontrado el parte asociado. Abre el detalle del parte y vuelve a intentarlo.', 'warning'); return; }
   if (!area) { toast('Selecciona el área.', 'warning'); return; }
   if (!tipo) { toast('Selecciona el tipo de entrada.', 'warning'); return; }
   if (!desc) { toast('La descripción es obligatoria.', 'warning'); return; }

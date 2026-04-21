@@ -24,7 +24,11 @@ function searchIncidencias(filtros) {
       for (var p = 1; p < partesData.length; p++) {
         var pRow = partesData[p];
         if (pRow[COLS.PARTES.ID]) {
-          partesMap[pRow[COLS.PARTES.ID]] = parseListValue(pRow[COLS.PARTES.PROFESIONALES]).map(function(v) {
+          var normalizadas = normalizarSeparacionProfesionalesYAreas(
+            pRow[COLS.PARTES.PROFESIONALES],
+            pRow[COLS.PARTES.AREAS_IMPLICADAS]
+          );
+          partesMap[pRow[COLS.PARTES.ID]] = normalizadas.profesionales.map(function(v) {
             return v.toLowerCase();
           });
         }

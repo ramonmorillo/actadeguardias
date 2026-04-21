@@ -49,6 +49,12 @@ function createIncidencia(token, data) {
     requireField(data.area,        'Área');
     requireField(data.tipoEntrada, 'Tipo de entrada');
     var areaValidada = validateAreaIncidencia(data.area);
+    var parte = findRow(CONFIG.SHEETS.PARTES, COLS.PARTES.ID, data.idParte);
+    if (!parte) throw new Error('Parte no encontrado: ' + data.idParte);
+    if (parte.row[COLS.PARTES.ESTADO] === CONFIG.ESTADOS_PARTE.CERRADO &&
+        user.rol !== CONFIG.ROLES.ADMIN) {
+      throw new Error('El parte está cerrado. Solo un administrador puede añadir incidencias.');
+    }
 
     var warnings = checkSensitiveData([
       { name: 'Descripción', value: data.descripcion },
