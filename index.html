@@ -650,23 +650,9 @@
         </button>
       </div>
 
-      <!-- Listado de incidencias del informe -->
-      <div class="table-card">
-        <div class="px-3 py-2 border-bottom fw-semibold small">Listado cronológico de incidencias</div>
-        <div class="table-responsive">
-          <table class="table table-hover mb-0">
-            <thead>
-              <tr>
-                <th>Fecha evento</th><th>Área</th><th>Tipo</th>
-                <th>Descripción</th><th>Actuación</th><th>Medicamentos</th>
-                <th>Servicio</th><th>Prioridad</th><th>Estado</th>
-                <th>Registrado por</th><th>Parte</th>
-              </tr>
-            </thead>
-            <tbody id="inf-tabla-body"></tbody>
-          </table>
-        </div>
-      </div>
+      <!-- Listado por parte -->
+      <div id="inf-partes-container"></div>
+
     </div>
 
   </div>
@@ -937,15 +923,26 @@
         <!-- Adjuntos -->
         <div id="mi-adjuntos-section">
           <div class="form-section-title mt-2">Archivos adjuntos</div>
-          <div id="mi-adjuntos-lista" class="mb-2"></div>
-          <div class="d-flex gap-2 align-items-center flex-wrap">
-            <input type="file" class="form-control form-control-sm" id="mi-archivo"
-                   style="max-width:300px;" onchange="previsualizarArchivo(this)">
-            <button class="btn btn-outline-secondary btn-sm" id="btn-subir-adj"
-                    onclick="subirAdjunto()" style="display:none;">
-              <i class="bi bi-cloud-upload me-1"></i>Subir archivo
-            </button>
-            <span class="text-muted small">(máx. 5 MB por archivo)</span>
+
+          <!-- Nota para incidencia nueva (antes de guardar) -->
+          <div id="mi-adj-nota" class="text-muted small py-1" style="display:none;">
+            <i class="bi bi-info-circle me-1"></i>
+            Los adjuntos se pueden añadir una vez guardada la incidencia.
+            Guarda primero y luego edítala para adjuntar archivos.
+          </div>
+
+          <!-- Sección de upload (solo en modo edición) -->
+          <div id="mi-adj-upload" style="display:none;">
+            <div id="mi-adjuntos-lista" class="mb-2"></div>
+            <div class="d-flex gap-2 align-items-center flex-wrap">
+              <input type="file" class="form-control form-control-sm" id="mi-archivo"
+                     style="max-width:300px;" onchange="previsualizarArchivo(this)">
+              <button class="btn btn-outline-secondary btn-sm" id="btn-subir-adj"
+                      onclick="subirAdjunto()" style="display:none;">
+                <i class="bi bi-cloud-upload me-1"></i>Subir archivo
+              </button>
+              <span class="text-muted small">(máx. 5 MB por archivo)</span>
+            </div>
           </div>
         </div>
 
@@ -1561,9 +1558,13 @@ function abrirModalIncidencia(incId) {
   document.getElementById('mi-estado').value   = 'abierta';
   document.getElementById('mi-warnings').style.display = 'none';
   document.getElementById('mi-meta').textContent = '';
-  document.getElementById('mi-adjuntos-lista').innerHTML = '';
   document.getElementById('mi-archivo').value   = '';
   document.getElementById('btn-subir-adj').style.display = 'none';
+  // Resetear secciones de adjuntos (se muestran según modo al final)
+  document.getElementById('mi-adj-nota').style.display   = 'none';
+  document.getElementById('mi-adj-upload').style.display = 'none';
+  var listaAdj = document.getElementById('mi-adjuntos-lista');
+  if (listaAdj) listaAdj.innerHTML = '';
 
   if (incId) {
     // Editar incidencia existente
@@ -1595,14 +1596,19 @@ function abrirModalIncidencia(incId) {
       document.getElementById('mi-meta').textContent   =
         'Registrado por ' + (inc.registradoPor||'—') + ' · ' + fmtDT(inc.fechaRegistro);
 
+      // Modo edición: mostrar sección de upload de adjuntos
+      document.getElementById('mi-adj-upload').style.display = '';
+      document.getElementById('mi-adj-nota').style.display   = 'none';
       cargarAdjuntosModal(inc.id);
       APP.modalIncInst.show();
     });
   } else {
-    // Nueva incidencia
+    // Nueva incidencia: mostrar nota informativa sobre adjuntos
     APP.currentIncId = null;
     document.getElementById('modalIncLbl').textContent  = 'Nueva incidencia';
     document.getElementById('mi-parte-id').value = APP.currentParteId || '';
+    document.getElementById('mi-adj-nota').style.display   = '';
+    document.getElementById('mi-adj-upload').style.display = 'none';
 
     var ahora = new Date();
     var pad   = function(n){ return n<10?'0'+n:''+n; };
@@ -1837,49 +1843,113 @@ function generarInforme() {
   var params = {
     fechaDesde:  desde,
     fechaHasta:  hasta,
-    area:        document.getElementById('inf-area').value       || undefined,
-    tipoEntrada: document.getElementById('inf-tipo').value       || undefined,
-    prioridad:   document.getElementById('inf-prioridad').value  || undefined,
-    medicamento: document.getElementById('inf-medicamento').value.trim() || undefined
+    area:        document.getElementById('inf-area').value              || undefined,
+    tipoEntrada: document.getElementById('inf-tipo').value              || undefined,
+    prioridad:   document.getElementById('inf-prioridad').value         || undefined,
+    medicamento: document.getElementById('inf-medicamento').value.trim()|| undefined
   };
-  Object.keys(params).forEach(function(k){ if(!params[k]) delete params[k]; });
+  Object.keys(params).forEach(function(k){ if (!params[k]) delete params[k]; });
 
   llamar('generateInforme', [params], 'Generando informe…', function(data) {
     APP.informeData = data;
     document.getElementById('inf-resultado').style.display = '';
 
+    // KPIs
     document.getElementById('inf-kpi-partes').textContent = data.totalPartes;
     document.getElementById('inf-kpi-total').textContent  = data.totalIncidencias;
 
     // Desglose por área
-    var ulArea = document.getElementById('inf-por-area');
-    ulArea.innerHTML = Object.keys(data.porArea).map(function(k) {
-      return '<li><span class="fw-semibold">' + data.porArea[k] + '</span> ' + k + '</li>';
-    }).join('') || '<li class="text-muted">—</li>';
+    document.getElementById('inf-por-area').innerHTML =
+      Object.keys(data.porArea).map(function(k) {
+        return '<li><span class="fw-semibold">' + data.porArea[k] + '</span> ' + k + '</li>';
+      }).join('') || '<li class="text-muted">—</li>';
 
     // Desglose por tipo
-    var ulTipo = document.getElementById('inf-por-tipo');
-    ulTipo.innerHTML = Object.keys(data.porTipo).map(function(k) {
-      return '<li><span class="fw-semibold">' + data.porTipo[k] + '</span> ' + k + '</li>';
-    }).join('') || '<li class="text-muted">—</li>';
+    document.getElementById('inf-por-tipo').innerHTML =
+      Object.keys(data.porTipo).map(function(k) {
+        return '<li><span class="fw-semibold">' + data.porTipo[k] + '</span> ' + k + '</li>';
+      }).join('') || '<li class="text-muted">—</li>';
 
-    // Tabla listado
-    var tbody = document.getElementById('inf-tabla-body');
-    tbody.innerHTML = data.incidencias.map(function(i) {
-      return '<tr>' +
-        '<td class="small">' + fmtDT(i.fechaEvento)         + '</td>' +
-        '<td class="small">' + (i.area||'—')                + '</td>' +
-        '<td class="small">' + (i.tipoEntrada||'—')         + '</td>' +
-        '<td class="small">' + truncar(i.descripcion, 80)   + '</td>' +
-        '<td class="small">' + truncar(i.actuacion, 60)     + '</td>' +
-        '<td class="small">' + truncar(i.medicamentos, 40)  + '</td>' +
-        '<td class="small">' + truncar(i.servicio, 40)      + '</td>' +
-        '<td>'               + badgePrio(i.prioridad)       + '</td>' +
-        '<td>'               + badgeEstado(i.estado)        + '</td>' +
-        '<td class="small">' + (i.registradoPor||'—')       + '</td>' +
-        '<td class="small"><a href="#" class="text-primary text-decoration-none" onclick="abrirParte(\'' + i.idParte + '\')">' + i.idParte + '</a></td>' +
-      '</tr>';
-    }).join('') || '<tr><td colspan="11" class="text-center text-muted py-3">Sin incidencias en el periodo.</td></tr>';
+    // ── Listado por parte ────────────────────────────────────────────────
+    var cont = document.getElementById('inf-partes-container');
+
+    if (!data.partesConIncidencias || !data.partesConIncidencias.length) {
+      cont.innerHTML = '<p class="text-muted text-center py-3">Sin partes en el periodo seleccionado.</p>';
+      return;
+    }
+
+    cont.innerHTML = data.partesConIncidencias.map(function(item, idx) {
+      var p   = item.parte;
+      var incs = item.incidencias;
+
+      // Cabecera del parte
+      var estadoBadge = badgeEstado(p.estado);
+      var cabeceraHTML =
+        '<div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-2">' +
+          '<div>' +
+            '<span class="text-muted small fw-semibold">PARTE ' + (idx + 1) + ' · </span>' +
+            '<a href="#" class="fw-bold text-primary text-decoration-none" onclick="abrirParte(\'' + p.id + '\')">' + p.id + '</a>' +
+            ' ' + estadoBadge +
+          '</div>' +
+          '<span class="text-muted small">' + fmtD(p.fechaInicio) + ' → ' + fmtD(p.fechaFin) + ' · ' + (p.tipoPeriodo || '—') + '</span>' +
+        '</div>' +
+        '<div class="row g-2 small mb-2">' +
+          '<div class="col-sm-6"><span class="text-muted">Profesionales:</span> ' + escHtml(p.profesionales || 'No indicados') + '</div>' +
+          '<div class="col-sm-3"><span class="text-muted">Creado por:</span> ' + (p.creadoPor || '—') + '</div>' +
+          '<div class="col-sm-3"><span class="text-muted">Fecha:</span> ' + fmtD(p.fechaCreacion) + '</div>' +
+          (p.observaciones
+            ? '<div class="col-12"><span class="text-muted">Observaciones:</span> <em>' + escHtml(p.observaciones) + '</em></div>'
+            : '') +
+        '</div>';
+
+      // Incidencias del parte
+      var incidenciasHTML;
+      if (!incs.length) {
+        incidenciasHTML =
+          '<div class="text-muted small fst-italic py-2 ps-1">' +
+          '<i class="bi bi-info-circle me-1"></i>Sin incidencias registradas en este parte.' +
+          '</div>';
+      } else {
+        var filas = incs.map(function(inc) {
+          return '<tr>' +
+            '<td class="small">' + fmtDT(inc.fechaEvento)           + '</td>' +
+            '<td class="small">' + (inc.area        || '—')         + '</td>' +
+            '<td class="small">' + (inc.tipoEntrada || '—')         + '</td>' +
+            '<td class="small">' + truncar(inc.descripcion, 90)     + '</td>' +
+            '<td class="small">' + truncar(inc.actuacion,   60)     + '</td>' +
+            '<td class="small">' + truncar(inc.medicamentos,40)     + '</td>' +
+            '<td class="small">' + truncar(inc.servicio,    35)     + '</td>' +
+            '<td>'               + badgePrio(inc.prioridad)         + '</td>' +
+            '<td>'               + badgeEstado(inc.estado)          + '</td>' +
+            '<td class="small text-muted">' + (inc.registradoPor || '—') + '</td>' +
+            (inc.seguimiento
+              ? '<td class="small text-warning-emphasis"><i class="bi bi-arrow-right-circle me-1"></i>' + truncar(inc.seguimiento, 60) + '</td>'
+              : '<td class="small text-muted">—</td>') +
+          '</tr>';
+        }).join('');
+
+        incidenciasHTML =
+          '<div class="table-responsive">' +
+          '<table class="table table-hover table-sm mb-0" style="font-size:.8rem">' +
+          '<thead><tr>' +
+            '<th>Fecha</th><th>Área</th><th>Tipo</th><th>Descripción</th>' +
+            '<th>Actuación</th><th>Medicamentos</th><th>Servicio</th>' +
+            '<th>Prioridad</th><th>Estado</th><th>Registrado por</th><th>Seguimiento</th>' +
+          '</tr></thead>' +
+          '<tbody>' + filas + '</tbody>' +
+          '</table></div>';
+      }
+
+      return '<div class="card border-0 shadow-sm mb-3" style="border-radius:8px;border-left:4px solid #1a73e8!important">' +
+        '<div class="card-header bg-light border-bottom py-2" style="border-radius:8px 8px 0 0">' +
+          cabeceraHTML +
+          '<span class="badge bg-secondary">' + incs.length + ' incidencia' + (incs.length !== 1 ? 's' : '') + '</span>' +
+        '</div>' +
+        '<div class="card-body p-0">' +
+          incidenciasHTML +
+        '</div>' +
+      '</div>';
+    }).join('');
   });
 }
 
