@@ -14,6 +14,9 @@ function getPartesSchema() {
     map[key] = i;
   });
 
+  var hasAreasCol = map['areasimplicadas'] !== undefined;
+  var shiftIfLegacy = hasAreasCol ? 0 : -1; // histórico sin AreasImplicadas
+
   var findIdx = function(posibles, fallback) {
     for (var i = 0; i < posibles.length; i++) {
       if (map[posibles[i]] !== undefined) return map[posibles[i]];
@@ -27,13 +30,13 @@ function getPartesSchema() {
     FECHA_FIN: findIdx(['fechafin'], COLS.PARTES.FECHA_FIN),
     TIPO_PERIODO: findIdx(['tipoperiodo'], COLS.PARTES.TIPO_PERIODO),
     PROFESIONALES: findIdx(['profesionales'], COLS.PARTES.PROFESIONALES),
-    AREAS_IMPLICADAS: findIdx(['areasimplicadas'], COLS.PARTES.AREAS_IMPLICADAS),
-    CREADO_POR: findIdx(['creadopor'], COLS.PARTES.CREADO_POR),
-    FECHA_CREACION: findIdx(['fechacreacion'], COLS.PARTES.FECHA_CREACION),
-    ULTIMA_MODIFICACION: findIdx(['ultimamodificacion'], COLS.PARTES.ULTIMA_MODIFICACION),
-    MODIFICADO_POR: findIdx(['modificadopor'], COLS.PARTES.MODIFICADO_POR),
-    ESTADO: findIdx(['estado'], COLS.PARTES.ESTADO),
-    OBSERVACIONES: findIdx(['observaciones'], COLS.PARTES.OBSERVACIONES)
+    AREAS_IMPLICADAS: findIdx(['areasimplicadas'], hasAreasCol ? COLS.PARTES.AREAS_IMPLICADAS : -1),
+    CREADO_POR: findIdx(['creadopor'], COLS.PARTES.CREADO_POR + shiftIfLegacy),
+    FECHA_CREACION: findIdx(['fechacreacion'], COLS.PARTES.FECHA_CREACION + shiftIfLegacy),
+    ULTIMA_MODIFICACION: findIdx(['ultimamodificacion'], COLS.PARTES.ULTIMA_MODIFICACION + shiftIfLegacy),
+    MODIFICADO_POR: findIdx(['modificadopor'], COLS.PARTES.MODIFICADO_POR + shiftIfLegacy),
+    ESTADO: findIdx(['estado'], COLS.PARTES.ESTADO + shiftIfLegacy),
+    OBSERVACIONES: findIdx(['observaciones'], COLS.PARTES.OBSERVACIONES + shiftIfLegacy)
   };
 }
 
@@ -57,7 +60,7 @@ function rowToParte(row, opts) {
   var schema = opts.schema || getPartesSchema();
   var areasCatalogo = opts.areasCatalogo || CONFIG.AREAS;
   var profesionalesList = parseListValue(rowVal(row, schema.PROFESIONALES));
-  var areasList = parseListValue(rowVal(row, schema.AREAS_IMPLICADAS));
+  var areasList = schema.AREAS_IMPLICADAS >= 0 ? parseListValue(rowVal(row, schema.AREAS_IMPLICADAS)) : [];
   var normalizadas = normalizarSeparacionProfesionalesYAreas(profesionalesList, areasList, areasCatalogo);
   return {
     id:                  normalizeIdKey(rowVal(row, schema.ID)),
@@ -276,10 +279,14 @@ function listPartesConConteo(limit) {
       });
 
     // Contar incidencias por parte en una sola lectura
+    var incSchema = getIncidenciasSchema();
     var incRaw = getAllRaw(CONFIG.SHEETS.INCIDENCIAS);
     var conteo = {};
     for (var i = 1; i < incRaw.length; i++) {
-      var pid = normalizeIdKey(incRaw[i][COLS.INCIDENCIAS.ID_PARTE]);
+      var rowInc = incRaw[i] || [];
+      var pid = normalizeIdKey(rowVal(rowInc, incSchema.ID_PARTE));
+      var incId = normalizeIdKey(rowVal(rowInc, incSchema.ID));
+      if (!incId) continue;
       if (pid) conteo[pid] = (conteo[pid] || 0) + 1;
     }
 
