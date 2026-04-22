@@ -1530,8 +1530,10 @@ function llamar(fnName, args, spinnerMsg, onSuccess, onError) {
   var run = google.script.run
     .withSuccessHandler(function(result) {
       hideSpinner();
+      console.log('[DIAG] ' + fnName + ' raw result:', JSON.stringify(result));
       var isOk = !!(result && (result.success === true || result.ok === true));
       if (!isOk) {
+        console.error('[DIAG] ' + fnName + ' isOk=false. result.success=' + (result&&result.success) + ' result.ok=' + (result&&result.ok));
         var msg = (result && (result.message || result.error))
           ? (result.message || result.error)
           : ('Error al ejecutar "' + fnName + '".');
