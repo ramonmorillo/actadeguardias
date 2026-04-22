@@ -1802,6 +1802,9 @@ function renderDashIncidencias() {
         '<td><button class="btn btn-outline-secondary btn-sm py-0" onclick="abrirParte(\'' + i.idParte + '\')"><i class="bi bi-box-arrow-up-right"></i></button></td>' +
       '</tr>';
     }).join('');
+  }, function() {
+    document.getElementById('dash-incidencias-body').innerHTML =
+      '<tr><td colspan="7" class="text-center text-muted py-3">No se pudieron cargar las incidencias.</td></tr>';
   });
 }
 
@@ -1830,6 +1833,9 @@ function renderDashSeguimiento(incs) {
 function cargarHistorico() {
   llamar('listPartesConConteo', [], 'Cargando histórico…', function(partes) {
     APP.histAllPartes = partes || [];
+    filtrarHistorico();
+  }, function() {
+    APP.histAllPartes = [];
     filtrarHistorico();
   });
 }
@@ -1928,6 +1934,8 @@ function abrirParte(id) {
 
     APP.parteIncidencias = data.incidencias || [];
     renderIncidencias();
+  }, function(errMsg) {
+    toast('No se pudo cargar el parte: ' + (errMsg || 'error desconocido'), 'danger');
   });
 }
 
