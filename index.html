@@ -2454,7 +2454,10 @@ function buscar(page) {
     var tbody = document.getElementById('bq-body');
     var incs  = res.resultados || [];
     if (!incs.length) {
-      tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3">Sin resultados.</td></tr>';
+      var hayFiltros = Object.keys(filtros).some(function(k) { return k !== 'page' && k !== 'pageSize'; });
+      tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3">' +
+        (hayFiltros ? 'Sin resultados para los filtros aplicados.' : 'No hay incidencias registradas aún.') +
+        '</td></tr>';
     } else {
       tbody.innerHTML = incs.map(function(i) {
         return '<tr>' +
@@ -2475,6 +2478,13 @@ function buscar(page) {
     document.getElementById('bq-next').disabled = (page >= res.totalPaginas);
     document.getElementById('bq-page-info').textContent =
       'Página ' + res.pagina + ' / ' + res.totalPaginas;
+  }, function(errMsg) {
+    document.getElementById('bq-resultados').style.display = '';
+    document.getElementById('bq-total-label').textContent = 'Error en la búsqueda';
+    document.getElementById('bq-body').innerHTML =
+      '<tr><td colspan="9" class="text-center text-danger py-3">' +
+      '<i class="bi bi-exclamation-triangle me-1"></i>' + (errMsg || 'Error desconocido') +
+      '</td></tr>';
   });
 }
 
@@ -2695,6 +2705,11 @@ function cargarEstadisticas() {
     renderChartArray('chart-meds',  'bar', est.medicamentosFrecuentes,  '#1a73e8');
     renderChartArray('chart-prof',  'bar', est.profesionalesMasActivos, '#34a853');
     renderChartArray('chart-mensual','line', est.evolucionMensual,       '#1a73e8');
+  }, function(errMsg) {
+    ['est-total','est-abiertas','est-resueltas','est-criticas'].forEach(function(id) {
+      document.getElementById(id).textContent = 'Error';
+    });
+    toast('Error al cargar estadísticas: ' + (errMsg || 'error desconocido'), 'danger');
   });
 }
 
