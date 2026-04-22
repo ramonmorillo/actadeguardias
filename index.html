@@ -2175,9 +2175,14 @@ function guardarParte() {
   if (!fin)    { toast('La fecha de fin es obligatoria.',    'warning'); return; }
   if (!tipo)   { toast('Selecciona el tipo de periodo.',     'warning'); return; }
 
+  var dInicio = new Date(inicio);
+  var dFin    = new Date(fin);
+  if (isNaN(dInicio.getTime())) { toast('Fecha de inicio no válida.', 'warning'); return; }
+  if (isNaN(dFin.getTime()))    { toast('Fecha de fin no válida.',    'warning'); return; }
+
   var data = {
-    fechaInicio: new Date(inicio).toISOString(),
-    fechaFin:    new Date(fin).toISOString(),
+    fechaInicio: dInicio.toISOString(),
+    fechaFin:    dFin.toISOString(),
     tipoPeriodo: tipo, estado: estado,
     profesionalesLista: profs,
     areasImplicadasLista: areasImplicadas,
@@ -2304,7 +2309,7 @@ function guardarIncidencia() {
 
   var data = {
     idParte:     parteId,
-    fechaEvento: fechaEv ? new Date(fechaEv).toISOString() : new Date().toISOString(),
+    fechaEvento: (function(){ var d = fechaEv ? new Date(fechaEv) : new Date(); return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString(); })(),
     area: area, tipoEntrada: tipo, descripcion: desc,
     actuacion: act, medicamentos: meds, servicio: serv,
     prioridad: prio, estado: estado, etiquetas: etiq, seguimiento: seg
