@@ -1530,10 +1530,8 @@ function llamar(fnName, args, spinnerMsg, onSuccess, onError) {
   var run = google.script.run
     .withSuccessHandler(function(result) {
       hideSpinner();
-      console.log('[DIAG] ' + fnName + ' raw result:', JSON.stringify(result));
       var isOk = !!(result && (result.success === true || result.ok === true));
       if (!isOk) {
-        console.error('[DIAG] ' + fnName + ' isOk=false. result.success=' + (result&&result.success) + ' result.ok=' + (result&&result.ok));
         var msg = (result && (result.message || result.error))
           ? (result.message || result.error)
           : ('Error al ejecutar "' + fnName + '".');
@@ -2408,6 +2406,8 @@ function initBusqueda() {
       });
     });
   }
+  // Mostrar todos los resultados al entrar en la vista
+  buscar(1);
 }
 
 function limpiarBusqueda() {
@@ -2417,7 +2417,8 @@ function limpiarBusqueda() {
   ['bq-parte','bq-area','bq-tipo','bq-prioridad','bq-estado','bq-adjuntos'].forEach(function(id) {
     document.getElementById(id).value = '';
   });
-  document.getElementById('bq-resultados').style.display = 'none';
+  // Buscar sin filtros para mostrar todos los resultados tras limpiar
+  buscar(1);
 }
 
 function buscar(page) {
@@ -2702,14 +2703,15 @@ var PALETA_AZUL   = ['#1a73e8','#2196f3','#42a5f5','#64b5f6','#90caf9','#bbdefb'
 var PALETA_ESTADO = ['#fbbc04','#34a853','#4285f4','#ea4335'];
 
 function renderChart(canvasId, tipo, objetoData, colores) {
-  var etiquetas = Object.keys(objetoData);
+  var etiquetas = objetoData ? Object.keys(objetoData) : [];
   var valores   = etiquetas.map(function(k){ return objetoData[k]; });
   renderChartRaw(canvasId, tipo, etiquetas, valores, colores);
 }
 
 function renderChartArray(canvasId, tipo, arrayData, color) {
-  var etiquetas = arrayData.map(function(d){ return d.etiqueta; });
-  var valores   = arrayData.map(function(d){ return d.valor; });
+  var arr = arrayData || [];
+  var etiquetas = arr.map(function(d){ return d.etiqueta; });
+  var valores   = arr.map(function(d){ return d.valor; });
   renderChartRaw(canvasId, tipo, etiquetas, valores, color);
 }
 
