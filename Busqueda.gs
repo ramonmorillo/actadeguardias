@@ -14,14 +14,14 @@
 function searchIncidencias(filtros) {
   try {
     var schemaInc = getIncidenciasSchema();
-    var schemaPartes = getPartesSchema();
     filtros = filtros || {};
     var data = getAllRaw(CONFIG.SHEETS.INCIDENCIAS);
     if (data.length <= 1) return ok({ total: 0, totalPaginas: 0, pagina: 1, resultados: [] });
 
-    // Pre-carga partes si se necesita filtrar por profesional de guardia
+    // Pre-carga partes solo si se filtra por profesional de guardia
     var partesMap = {};
     if (filtros.profesionalGuardia) {
+      var schemaPartes = getPartesSchema();
       var partesData = getAllRaw(CONFIG.SHEETS.PARTES);
       for (var p = 1; p < partesData.length; p++) {
         var pRow = partesData[p];
