@@ -102,9 +102,11 @@ function matchesFiltros(row, f, partesMap, schemaInc) {
   if (f.tipoEntrada && rowVal(row, schemaInc.TIPO_ENTRADA)   !== f.tipoEntrada)   return false;
   if (f.prioridad   && rowVal(row, schemaInc.PRIORIDAD)      !== f.prioridad)     return false;
   if (f.estado      && rowVal(row, schemaInc.ESTADO)         !== f.estado)        return false;
-  if (f.registradoPor && rowVal(row, schemaInc.REGISTRADO_POR) !== f.registradoPor) return false;
-
   // Filtros parciales
+  if (f.registradoPor) {
+    var regPor = (rowVal(row, schemaInc.REGISTRADO_POR) || '').toLowerCase();
+    if (regPor.indexOf(f.registradoPor.toLowerCase()) === -1) return false;
+  }
   if (f.medicamento) {
     var med = (rowVal(row, schemaInc.MEDICAMENTOS) || '').toLowerCase();
     if (med.indexOf(f.medicamento.toLowerCase()) === -1) return false;
