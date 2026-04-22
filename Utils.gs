@@ -252,7 +252,9 @@ function resolveColumnIndex(headerMap, aliases, fallback) {
 }
 
 function rowVal(row, idx) {
-  return (idx >= 0 && row && idx < row.length) ? row[idx] : '';
+  var v = (idx >= 0 && row && idx < row.length) ? row[idx] : '';
+  if (v instanceof Date) return isNaN(v.getTime()) ? '' : v.toISOString();
+  return v;
 }
 
 function getUsuariosSchema() {
