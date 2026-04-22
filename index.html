@@ -1654,6 +1654,11 @@ function iniciarApp(user) {
     APP.catalogos = cat;
     poblarSelectoresCatalogos();
     showView('dashboard');
+  }, function() {
+    APP.catalogos = {};
+    poblarSelectoresCatalogos();
+    showView('dashboard');
+    toast('No se pudieron cargar los catálogos. Algunas listas pueden estar incompletas.', 'warning');
   });
 }
 
