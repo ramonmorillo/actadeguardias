@@ -276,15 +276,19 @@ function listPartesConConteo(limit) {
       });
 
     // Contar incidencias por parte en una sola lectura
-    var incSchema = getIncidenciasSchema();
-    var incRaw = getAllRaw(CONFIG.SHEETS.INCIDENCIAS);
     var conteo = {};
-    for (var i = 1; i < incRaw.length; i++) {
-      var rowInc = incRaw[i] || [];
-      var pid = normalizeIdKey(rowVal(rowInc, incSchema.ID_PARTE));
-      var incId = normalizeIdKey(rowVal(rowInc, incSchema.ID));
-      if (!incId) continue;
-      if (pid) conteo[pid] = (conteo[pid] || 0) + 1;
+    try {
+      var incSchema = getIncidenciasSchema();
+      var incRaw = getAllRaw(CONFIG.SHEETS.INCIDENCIAS);
+      for (var i = 1; i < incRaw.length; i++) {
+        var rowInc = incRaw[i] || [];
+        var pid = normalizeIdKey(rowVal(rowInc, incSchema.ID_PARTE));
+        var incId = normalizeIdKey(rowVal(rowInc, incSchema.ID));
+        if (!incId) continue;
+        if (pid) conteo[pid] = (conteo[pid] || 0) + 1;
+      }
+    } catch (incErr) {
+      logErr('listPartesConConteo.incidencias', incErr);
     }
 
     partes.forEach(function(p) { p.numIncidencias = conteo[p.id] || 0; });

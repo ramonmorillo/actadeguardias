@@ -31,6 +31,7 @@ function getEstadisticas(params) {
       if (!rowVal(row, schemaInc.ID)) continue;
 
       var fe = new Date(rowVal(row, schemaInc.FECHA_EVENTO));
+      if (isNaN(fe.getTime())) continue;
       if (desde && fe < desde) continue;
       if (hasta && fe > hasta) continue;
 

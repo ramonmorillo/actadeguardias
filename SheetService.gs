@@ -51,7 +51,9 @@ function getAllRaw(sheetName) {
   var sheet = getSheet(sheetName);
   var lastRow = sheet.getLastRow();
   if (lastRow < 1) return [];
-  return sheet.getRange(1, 1, lastRow, sheet.getLastColumn()).getValues();
+  var lastCol = sheet.getLastColumn();
+  if (lastCol < 1) return [];
+  return sheet.getRange(1, 1, lastRow, lastCol).getValues();
 }
 
 /**

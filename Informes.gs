@@ -14,7 +14,6 @@
 function generateInforme(params) {
   try {
     var schemaPartes = getPartesSchema();
-    var schemaInc = getIncidenciasSchema();
     params = params || {};
     var desde = normalizeDateInput(params.fechaDesde, 'Europe/Madrid', false);
     var hasta = normalizeDateInput(params.fechaHasta, 'Europe/Madrid', true);
@@ -81,45 +80,57 @@ function generateInforme(params) {
     partes.forEach(function(p) { incByParte[p.id] = []; });
 
     // ── 3. Incidencias filtradas, agrupadas por parte ─────────────────────
-    var incRaw         = getAllRaw(CONFIG.SHEETS.INCIDENCIAS);
     var totalIncidencias = 0;
     var porArea        = {};
     var porTipo        = {};
     var porPrioridad   = {};
     var porEstado      = {};
 
-    for (var j = 1; j < incRaw.length; j++) {
-      var ir = incRaw[j];
-      if (!rowVal(ir, schemaInc.ID)) continue;
+    try {
+      var schemaInc = getIncidenciasSchema();
+      var incRaw    = getAllRaw(CONFIG.SHEETS.INCIDENCIAS);
 
-      // Solo incidencias cuyo parte esté en el rango seleccionado
-      var idParte = normalizeIdKey(rowVal(ir, schemaInc.ID_PARTE));
-      if (!parteIdSet[idParte]) continue;
+      for (var j = 1; j < incRaw.length; j++) {
+        var ir = incRaw[j];
+        if (!rowVal(ir, schemaInc.ID)) continue;
 
-      // Filtros opcionales sobre incidencias
-      if (params.area         && rowVal(ir, schemaInc.AREA)           !== params.area)         continue;
-      if (params.tipoEntrada  && rowVal(ir, schemaInc.TIPO_ENTRADA)   !== params.tipoEntrada)  continue;
-      if (params.prioridad    && rowVal(ir, schemaInc.PRIORIDAD)      !== params.prioridad)    continue;
-      if (params.registradoPor && rowVal(ir, schemaInc.REGISTRADO_POR) !== params.registradoPor) continue;
-      if (params.medicamento) {
-        var m = (rowVal(ir, schemaInc.MEDICAMENTOS) || '').toLowerCase();
-        if (m.indexOf(params.medicamento.toLowerCase()) === -1) continue;
+        // Solo incidencias cuyo parte esté en el rango seleccionado
+        var idParte = normalizeIdKey(rowVal(ir, schemaInc.ID_PARTE));
+        if (!parteIdSet[idParte]) continue;
+
+        // Filtros opcionales sobre incidencias
+        if (params.area         && rowVal(ir, schemaInc.AREA)           !== params.area)         continue;
+        if (params.tipoEntrada  && rowVal(ir, schemaInc.TIPO_ENTRADA)   !== params.tipoEntrada)  continue;
+        if (params.prioridad    && rowVal(ir, schemaInc.PRIORIDAD)      !== params.prioridad)    continue;
+        if (params.registradoPor && rowVal(ir, schemaInc.REGISTRADO_POR) !== params.registradoPor) continue;
+        if (params.medicamento) {
+          var m = (rowVal(ir, schemaInc.MEDICAMENTOS) || '').toLowerCase();
+          if (m.indexOf(params.medicamento.toLowerCase()) === -1) continue;
+        }
+
+        var inc;
+        try {
+          inc = rowToIncidencia(ir, schemaInc);
+        } catch (eInc) {
+          logErr('generateInforme.rowToIncidencia', eInc);
+          continue;
+        }
+        if (!incByParte[idParte]) incByParte[idParte] = [];
+        incByParte[idParte].push(inc);
+        totalIncidencias++;
+
+        // Agregados para el resumen
+        var a = rowVal(ir, schemaInc.AREA)         || 'Sin área';
+        var t = rowVal(ir, schemaInc.TIPO_ENTRADA) || 'Sin tipo';
+        var p = rowVal(ir, schemaInc.PRIORIDAD)    || 'Sin prioridad';
+        var e = rowVal(ir, schemaInc.ESTADO)       || 'Sin estado';
+        porArea[a]      = (porArea[a]      || 0) + 1;
+        porTipo[t]      = (porTipo[t]      || 0) + 1;
+        porPrioridad[p] = (porPrioridad[p] || 0) + 1;
+        porEstado[e]    = (porEstado[e]    || 0) + 1;
       }
-
-      var inc = rowToIncidencia(ir, schemaInc);
-      if (!incByParte[idParte]) incByParte[idParte] = [];
-      incByParte[idParte].push(inc);
-      totalIncidencias++;
-
-      // Agregados para el resumen
-      var a = rowVal(ir, schemaInc.AREA)         || 'Sin área';
-      var t = rowVal(ir, schemaInc.TIPO_ENTRADA) || 'Sin tipo';
-      var p = rowVal(ir, schemaInc.PRIORIDAD)    || 'Sin prioridad';
-      var e = rowVal(ir, schemaInc.ESTADO)       || 'Sin estado';
-      porArea[a]      = (porArea[a]      || 0) + 1;
-      porTipo[t]      = (porTipo[t]      || 0) + 1;
-      porPrioridad[p] = (porPrioridad[p] || 0) + 1;
-      porEstado[e]    = (porEstado[e]    || 0) + 1;
+    } catch (incErr) {
+      logErr('generateInforme.incidencias', incErr);
     }
 
     // ── 4. Construir estructura final: cada parte con sus incidencias ──────
