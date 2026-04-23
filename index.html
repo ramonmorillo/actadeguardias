@@ -1654,6 +1654,11 @@ function iniciarApp(user) {
     APP.catalogos = cat;
     poblarSelectoresCatalogos();
     showView('dashboard');
+  }, function() {
+    APP.catalogos = {};
+    poblarSelectoresCatalogos();
+    showView('dashboard');
+    toast('No se pudieron cargar los catálogos. Algunas listas pueden estar incompletas.', 'warning');
   });
 }
 
@@ -1802,6 +1807,9 @@ function renderDashIncidencias() {
         '<td><button class="btn btn-outline-secondary btn-sm py-0" onclick="abrirParte(\'' + i.idParte + '\')"><i class="bi bi-box-arrow-up-right"></i></button></td>' +
       '</tr>';
     }).join('');
+  }, function() {
+    document.getElementById('dash-incidencias-body').innerHTML =
+      '<tr><td colspan="7" class="text-center text-muted py-3">No se pudieron cargar las incidencias.</td></tr>';
   });
 }
 
@@ -1830,6 +1838,9 @@ function renderDashSeguimiento(incs) {
 function cargarHistorico() {
   llamar('listPartesConConteo', [], 'Cargando histórico…', function(partes) {
     APP.histAllPartes = partes || [];
+    filtrarHistorico();
+  }, function() {
+    APP.histAllPartes = [];
     filtrarHistorico();
   });
 }
@@ -1928,6 +1939,8 @@ function abrirParte(id) {
 
     APP.parteIncidencias = data.incidencias || [];
     renderIncidencias();
+  }, function(errMsg) {
+    toast('No se pudo cargar el parte: ' + (errMsg || 'error desconocido'), 'danger');
   });
 }
 
@@ -2447,14 +2460,21 @@ function buscar(page) {
 
   llamar('searchIncidencias', [filtros], 'Buscando…', function(res) {
     document.getElementById('bq-resultados').style.display = '';
+    var labelExtra = (res.totalSinFiltros > 0 && res.total < res.totalSinFiltros)
+      ? ' (de ' + res.totalSinFiltros + ' en total)' : '';
     document.getElementById('bq-total-label').textContent =
-      res.total + ' resultado' + (res.total !== 1 ? 's' : '') +
-      ' · página ' + res.pagina + ' de ' + res.totalPaginas;
+      res.total + ' resultado' + (res.total !== 1 ? 's' : '') + labelExtra +
+      ' · página ' + res.pagina + ' de ' + (res.totalPaginas || 1);
 
     var tbody = document.getElementById('bq-body');
     var incs  = res.resultados || [];
     if (!incs.length) {
-      tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3">Sin resultados.</td></tr>';
+      var hayFiltros = Object.keys(filtros).some(function(k) { return k !== 'page' && k !== 'pageSize'; });
+      var msgVacio = res.totalSinFiltros === 0
+        ? 'No hay incidencias registradas aún. Añade incidencias desde el detalle de un parte.'
+        : 'Sin resultados para los filtros aplicados.' +
+          (hayFiltros ? ' Prueba a ampliar el rango de fechas o eliminar algunos filtros.' : '');
+      tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3">' + msgVacio + '</td></tr>';
     } else {
       tbody.innerHTML = incs.map(function(i) {
         return '<tr>' +
@@ -2471,10 +2491,18 @@ function buscar(page) {
       }).join('');
     }
 
+    var totalPags = res.totalPaginas || 1;
     document.getElementById('bq-prev').disabled = (page <= 1);
     document.getElementById('bq-next').disabled = (page >= res.totalPaginas);
     document.getElementById('bq-page-info').textContent =
-      'Página ' + res.pagina + ' / ' + res.totalPaginas;
+      'Página ' + res.pagina + ' / ' + totalPags;
+  }, function(errMsg) {
+    document.getElementById('bq-resultados').style.display = '';
+    document.getElementById('bq-total-label').textContent = 'Error en la búsqueda';
+    document.getElementById('bq-body').innerHTML =
+      '<tr><td colspan="9" class="text-center text-danger py-3">' +
+      '<i class="bi bi-exclamation-triangle me-1"></i>' + (errMsg || 'Error desconocido') +
+      '</td></tr>';
   });
 }
 
@@ -2621,6 +2649,11 @@ function generarInforme() {
         '</div>' +
       '</div>';
     }).join('');
+  }, function(errMsg) {
+    document.getElementById('inf-resultado').style.display = '';
+    document.getElementById('inf-partes-container').innerHTML =
+      '<div class="alert alert-danger py-2"><i class="bi bi-exclamation-triangle me-1"></i>' +
+      (errMsg || 'Error al generar el informe') + '</div>';
   });
 }
 
@@ -2695,6 +2728,11 @@ function cargarEstadisticas() {
     renderChartArray('chart-meds',  'bar', est.medicamentosFrecuentes,  '#1a73e8');
     renderChartArray('chart-prof',  'bar', est.profesionalesMasActivos, '#34a853');
     renderChartArray('chart-mensual','line', est.evolucionMensual,       '#1a73e8');
+  }, function(errMsg) {
+    ['est-total','est-abiertas','est-resueltas','est-criticas'].forEach(function(id) {
+      document.getElementById(id).textContent = 'Error';
+    });
+    toast('Error al cargar estadísticas: ' + (errMsg || 'error desconocido'), 'danger');
   });
 }
 

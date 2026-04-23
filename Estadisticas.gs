@@ -9,7 +9,8 @@
 function getEstadisticas(params) {
   try {
     var schemaInc = getIncidenciasSchema();
-    var schemaPartes = getPartesSchema();
+    var schemaPartes;
+    try { schemaPartes = getPartesSchema(); } catch (e) { schemaPartes = null; }
     params = params || {};
     var desde = params.fechaDesde ? new Date(params.fechaDesde) : null;
     var hasta = params.fechaHasta ? new Date(params.fechaHasta) : null;
@@ -77,14 +78,16 @@ function getEstadisticas(params) {
     });
 
     // Estadísticas de partes en el mismo periodo
-    var partesData = getAllRaw(CONFIG.SHEETS.PARTES);
     var totalPartes = 0;
-    for (var p = 1; p < partesData.length; p++) {
-      if (!rowVal(partesData[p], schemaPartes.ID)) continue;
-      var fp = new Date(rowVal(partesData[p], schemaPartes.FECHA_INICIO));
-      if (desde && fp < desde) continue;
-      if (hasta && fp > hasta) continue;
-      totalPartes++;
+    if (schemaPartes) {
+      var partesData = getAllRaw(CONFIG.SHEETS.PARTES);
+      for (var p = 1; p < partesData.length; p++) {
+        if (!rowVal(partesData[p], schemaPartes.ID)) continue;
+        var fp = new Date(rowVal(partesData[p], schemaPartes.FECHA_INICIO));
+        if (desde && fp < desde) continue;
+        if (hasta && fp > hasta) continue;
+        totalPartes++;
+      }
     }
 
     return ok({

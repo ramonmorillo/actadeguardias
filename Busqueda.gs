@@ -14,14 +14,20 @@
 function searchIncidencias(filtros) {
   try {
     var schemaInc = getIncidenciasSchema();
-    var schemaPartes = getPartesSchema();
     filtros = filtros || {};
     var data = getAllRaw(CONFIG.SHEETS.INCIDENCIAS);
-    if (data.length <= 1) return ok({ total: 0, totalPaginas: 0, pagina: 1, resultados: [] });
+    if (data.length <= 1) return ok({ total: 0, totalSinFiltros: 0, totalPaginas: 0, pagina: 1, resultados: [] });
 
-    // Pre-carga partes si se necesita filtrar por profesional de guardia
+    // Contar filas válidas (para distinguir "hoja vacía" de "filtros demasiado estrictos")
+    var totalSinFiltros = 0;
+    for (var c = 1; c < data.length; c++) {
+      if (rowVal(data[c], schemaInc.ID)) totalSinFiltros++;
+    }
+
+    // Pre-carga partes solo si se filtra por profesional de guardia
     var partesMap = {};
     if (filtros.profesionalGuardia) {
+      var schemaPartes = getPartesSchema();
       var partesData = getAllRaw(CONFIG.SHEETS.PARTES);
       for (var p = 1; p < partesData.length; p++) {
         var pRow = partesData[p];
@@ -59,11 +65,12 @@ function searchIncidencias(filtros) {
     var paginated  = resultados.slice(start, start + pageSize);
 
     return ok({
-      total:       total,
-      totalPaginas: totalPags,
-      pagina:      page,
-      tamanyoPagina: pageSize,
-      resultados:  paginated
+      total:          total,
+      totalSinFiltros: totalSinFiltros,
+      totalPaginas:   totalPags,
+      pagina:         page,
+      tamanyoPagina:  pageSize,
+      resultados:     paginated
     });
   } catch (e) {
     logErr('searchIncidencias', e);
@@ -102,9 +109,11 @@ function matchesFiltros(row, f, partesMap, schemaInc) {
   if (f.tipoEntrada && rowVal(row, schemaInc.TIPO_ENTRADA)   !== f.tipoEntrada)   return false;
   if (f.prioridad   && rowVal(row, schemaInc.PRIORIDAD)      !== f.prioridad)     return false;
   if (f.estado      && rowVal(row, schemaInc.ESTADO)         !== f.estado)        return false;
-  if (f.registradoPor && rowVal(row, schemaInc.REGISTRADO_POR) !== f.registradoPor) return false;
-
   // Filtros parciales
+  if (f.registradoPor) {
+    var regPor = (rowVal(row, schemaInc.REGISTRADO_POR) || '').toLowerCase();
+    if (regPor.indexOf(f.registradoPor.toLowerCase()) === -1) return false;
+  }
   if (f.medicamento) {
     var med = (rowVal(row, schemaInc.MEDICAMENTOS) || '').toLowerCase();
     if (med.indexOf(f.medicamento.toLowerCase()) === -1) return false;
