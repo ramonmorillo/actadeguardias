@@ -2460,17 +2460,21 @@ function buscar(page) {
 
   llamar('searchIncidencias', [filtros], 'Buscando…', function(res) {
     document.getElementById('bq-resultados').style.display = '';
+    var labelExtra = (res.totalSinFiltros > 0 && res.total < res.totalSinFiltros)
+      ? ' (de ' + res.totalSinFiltros + ' en total)' : '';
     document.getElementById('bq-total-label').textContent =
-      res.total + ' resultado' + (res.total !== 1 ? 's' : '') +
-      ' · página ' + res.pagina + ' de ' + res.totalPaginas;
+      res.total + ' resultado' + (res.total !== 1 ? 's' : '') + labelExtra +
+      ' · página ' + res.pagina + ' de ' + (res.totalPaginas || 1);
 
     var tbody = document.getElementById('bq-body');
     var incs  = res.resultados || [];
     if (!incs.length) {
       var hayFiltros = Object.keys(filtros).some(function(k) { return k !== 'page' && k !== 'pageSize'; });
-      tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3">' +
-        (hayFiltros ? 'Sin resultados para los filtros aplicados.' : 'No hay incidencias registradas aún.') +
-        '</td></tr>';
+      var msgVacio = res.totalSinFiltros === 0
+        ? 'No hay incidencias registradas aún. Añade incidencias desde el detalle de un parte.'
+        : 'Sin resultados para los filtros aplicados.' +
+          (hayFiltros ? ' Prueba a ampliar el rango de fechas o eliminar algunos filtros.' : '');
+      tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3">' + msgVacio + '</td></tr>';
     } else {
       tbody.innerHTML = incs.map(function(i) {
         return '<tr>' +
@@ -2487,10 +2491,11 @@ function buscar(page) {
       }).join('');
     }
 
+    var totalPags = res.totalPaginas || 1;
     document.getElementById('bq-prev').disabled = (page <= 1);
     document.getElementById('bq-next').disabled = (page >= res.totalPaginas);
     document.getElementById('bq-page-info').textContent =
-      'Página ' + res.pagina + ' / ' + res.totalPaginas;
+      'Página ' + res.pagina + ' / ' + totalPags;
   }, function(errMsg) {
     document.getElementById('bq-resultados').style.display = '';
     document.getElementById('bq-total-label').textContent = 'Error en la búsqueda';

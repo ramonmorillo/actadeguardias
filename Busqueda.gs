@@ -16,7 +16,13 @@ function searchIncidencias(filtros) {
     var schemaInc = getIncidenciasSchema();
     filtros = filtros || {};
     var data = getAllRaw(CONFIG.SHEETS.INCIDENCIAS);
-    if (data.length <= 1) return ok({ total: 0, totalPaginas: 0, pagina: 1, resultados: [] });
+    if (data.length <= 1) return ok({ total: 0, totalSinFiltros: 0, totalPaginas: 0, pagina: 1, resultados: [] });
+
+    // Contar filas válidas (para distinguir "hoja vacía" de "filtros demasiado estrictos")
+    var totalSinFiltros = 0;
+    for (var c = 1; c < data.length; c++) {
+      if (rowVal(data[c], schemaInc.ID)) totalSinFiltros++;
+    }
 
     // Pre-carga partes solo si se filtra por profesional de guardia
     var partesMap = {};
@@ -59,11 +65,12 @@ function searchIncidencias(filtros) {
     var paginated  = resultados.slice(start, start + pageSize);
 
     return ok({
-      total:       total,
-      totalPaginas: totalPags,
-      pagina:      page,
-      tamanyoPagina: pageSize,
-      resultados:  paginated
+      total:          total,
+      totalSinFiltros: totalSinFiltros,
+      totalPaginas:   totalPags,
+      pagina:         page,
+      tamanyoPagina:  pageSize,
+      resultados:     paginated
     });
   } catch (e) {
     logErr('searchIncidencias', e);
