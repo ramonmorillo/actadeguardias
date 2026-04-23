@@ -284,8 +284,14 @@ function getParteHTML(parteId) {
         '</tr>';
       }).join('');
       incidenciasHTML =
-        '<table style="width:100%;border-collapse:collapse;font-size:10px">' +
-        '<thead><tr style="background:#e8f0fe">' +
+        '<table class="inc-table">' +
+        '<colgroup>' +
+          '<col style="width:9%"><col style="width:6%"><col style="width:7%">' +
+          '<col style="width:16%"><col style="width:14%"><col style="width:10%">' +
+          '<col style="width:8%"><col style="width:7%"><col style="width:7%">' +
+          '<col style="width:10%"><col style="width:6%">' +
+        '</colgroup>' +
+        '<thead><tr>' +
           '<th>Fecha</th><th>Área</th><th>Tipo</th><th>Descripción</th>' +
           '<th>Actuación</th><th>Medicamentos</th><th>Servicio</th>' +
           '<th>Prioridad</th><th>Estado</th><th>Registrado por</th><th>Seguimiento</th>' +
@@ -304,6 +310,11 @@ function getParteHTML(parteId) {
         'table tbody tr:nth-child(even){background:#f8f9fa}' +
         '.meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:10px 0;font-size:11px}' +
         '.meta-lbl{color:#5f6368;font-size:10px}' +
+        '.inc-table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:10px}' +
+        '.inc-table thead th{background:#e8f0fe;padding:5px 6px;text-align:left;font-size:10px;font-weight:600;white-space:normal;overflow-wrap:anywhere;word-break:break-word;vertical-align:top}' +
+        '.inc-table tbody td{padding:4px 6px;border-bottom:1px solid #f1f3f4;white-space:normal;overflow-wrap:anywhere;word-break:break-word;vertical-align:top}' +
+        '.inc-table tbody tr:nth-child(even){background:#f8f9fa}' +
+        '@page{size:A4 landscape;margin:10mm}' +
         '@media print{button{display:none!important}}' +
       '</style></head><body>' +
       '<div style="display:flex;justify-content:space-between;align-items:flex-start">' +
@@ -415,8 +426,14 @@ function getInformeHTML(params) {
         }).join('');
 
         incidenciasHTML =
-          '<table style="width:100%;border-collapse:collapse;margin-top:8px;font-size:10px">' +
-          '<thead><tr style="background:#e8f0fe">' +
+          '<table class="inc-table" style="margin-top:8px">' +
+          '<colgroup>' +
+            '<col style="width:9%"><col style="width:6%"><col style="width:7%">' +
+            '<col style="width:16%"><col style="width:14%"><col style="width:10%">' +
+            '<col style="width:8%"><col style="width:7%"><col style="width:7%">' +
+            '<col style="width:10%"><col style="width:6%">' +
+          '</colgroup>' +
+          '<thead><tr>' +
             '<th>Fecha</th><th>Área</th><th>Tipo</th><th>Descripción</th>' +
             '<th>Actuación</th><th>Medicamentos</th><th>Servicio</th>' +
             '<th>Prioridad</th><th>Estado</th><th>Registrado por</th><th>Seguimiento</th>' +
@@ -479,6 +496,11 @@ function getInformeHTML(params) {
         '.kpi{background:#f1f3f4;border-radius:6px;padding:10px 16px;min-width:90px}' +
         '.kpi-n{font-size:24px;font-weight:700;color:#1a73e8}' +
         '.kpi-l{font-size:10px;color:#666}' +
+        '.inc-table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:9px}' +
+        '.inc-table thead th{background:#e8f0fe;padding:5px 6px;text-align:left;font-size:9px;font-weight:600;white-space:normal;overflow-wrap:anywhere;word-break:break-word;vertical-align:top}' +
+        '.inc-table tbody td{padding:4px 6px;border-bottom:1px solid #f1f3f4;white-space:normal;overflow-wrap:anywhere;word-break:break-word;vertical-align:top}' +
+        '.inc-table tbody tr:nth-child(even){background:#f8f9fa}' +
+        '@page{size:A4 landscape;margin:10mm}' +
         '@media print{button{display:none!important}}' +
       '</style></head><body>' +
       '<h1>Informe de Guardias · Farmacia Hospitalaria</h1>' +
