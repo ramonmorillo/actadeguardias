@@ -2471,9 +2471,9 @@ function buscar(page) {
     if (!incs.length) {
       var hayFiltros = Object.keys(filtros).some(function(k) { return k !== 'page' && k !== 'pageSize'; });
       var msgVacio = res.totalSinFiltros === 0
-        ? 'No hay incidencias registradas aún. Añade incidencias desde el detalle de un parte.'
-        : 'Sin resultados para los filtros aplicados.' +
-          (hayFiltros ? ' Prueba a ampliar el rango de fechas o eliminar algunos filtros.' : '');
+        ? 'Aún no hay incidencias registradas. Ve a <a href="#" onclick="showView(\'historico\')" class="text-primary">Histórico</a>, abre un parte y usa el botón <strong>Nueva incidencia</strong>.'
+        : 'Sin resultados con los filtros activos.' +
+          (hayFiltros ? ' <a href="#" onclick="limpiarBusqueda()" class="text-primary ms-1">Quitar todos los filtros</a>' : '');
       tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3">' + msgVacio + '</td></tr>';
     } else {
       tbody.innerHTML = incs.map(function(i) {
