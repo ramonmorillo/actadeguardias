@@ -105,8 +105,9 @@ function createAusencia(data) {
     var fechaInicio = _parseDateValue_(payload.fechaInicio);
     var fechaFin = _parseDateValue_(payload.fechaFin);
     if (!personaAusente) return fail('personaAusente es obligatoria.');
-    if (!fechaInicio) return fail('fechaInicio es obligatoria y debe ser válida.');
-    if (!fechaFin) return fail('fechaFin es obligatoria y debe ser válida.');
+    if (!fechaInicio || !fechaFin) {
+      return fail('fechaInicio o fechaFin no tiene formato válido');
+    }
     if (fechaFin.getTime() < fechaInicio.getTime()) return fail('fechaFin no puede ser anterior a fechaInicio.');
 
     var now = new Date();
@@ -330,12 +331,40 @@ function _getAusenciasHeaderMap_(sheet) {
 function _parseDateValue_(value) {
   if (value === null || value === undefined || value === '') return null;
   if (value instanceof Date) return isNaN(value.getTime()) ? null : new Date(value.getTime());
-  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value.trim())) {
-    var p = value.split('-');
-    return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+  if (typeof value === 'string') {
+    var s = value.trim();
+    if (!s) return null;
+
+    var isoDateMatch = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(s);
+    if (isoDateMatch) {
+      return _buildLocalDate_(Number(isoDateMatch[1]), Number(isoDateMatch[2]), Number(isoDateMatch[3]));
+    }
+
+    var dmySlashMatch = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s);
+    if (dmySlashMatch) {
+      return _buildLocalDate_(Number(dmySlashMatch[3]), Number(dmySlashMatch[2]), Number(dmySlashMatch[1]));
+    }
+
+    var dmyDashMatch = /^(\d{1,2})-(\d{1,2})-(\d{4})$/.exec(s);
+    if (dmyDashMatch) {
+      return _buildLocalDate_(Number(dmyDashMatch[3]), Number(dmyDashMatch[2]), Number(dmyDashMatch[1]));
+    }
+
+    var parsed = new Date(s);
+    return isNaN(parsed.getTime()) ? null : parsed;
   }
+
   var d = new Date(value);
   return isNaN(d.getTime()) ? null : d;
+}
+
+function _buildLocalDate_(year, month, day) {
+  if (!year || !month || !day) return null;
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  var date = new Date(year, month - 1, day);
+  if (isNaN(date.getTime())) return null;
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null;
+  return date;
 }
 
 function _normalizeAusenciasFilters(params) {
