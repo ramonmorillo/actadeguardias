@@ -1806,10 +1806,10 @@ function cargarAusencias() {
     fechaDesde: document.getElementById('aus-f-desde').value || '',
     fechaHasta: document.getElementById('aus-f-hasta').value || ''
   };
-  mostrarCargando('Cargando ausencias…');
+  showSpinner('Cargando ausencias…');
   var runner = google.script.run
     .withSuccessHandler(function(res) {
-      ocultarCargando();
+      hideSpinner();
       try {
         if (!res || res.ok === false) {
           console.error('[Ausencias][backend getAusencias]', res);
@@ -1825,7 +1825,7 @@ function cargarAusencias() {
       }
     })
     .withFailureHandler(function(err) {
-      ocultarCargando();
+      hideSpinner();
       console.error('[Ausencias][backend getAusencias]', err);
       renderTablaAusencias([]);
       toast('Error al ejecutar getAusencias: ' + ((err && err.message) ? err.message : err), 'danger');
@@ -1902,12 +1902,12 @@ function guardarAusencia(event) {
   };
   console.log('[Ausencias][payload]', payload);
 
-  mostrarCargando('Guardando ausencia…');
+  showSpinner('Guardando ausencia…');
 
   if (id) {
     google.script.run
       .withSuccessHandler(function(resp) {
-        ocultarCargando();
+        hideSpinner();
         console.log('[Ausencias][success]', resp);
         if (!resp || resp.ok === false) {
           toast((resp && resp.error) ? resp.error : 'No se pudo guardar la ausencia', 'danger');
@@ -1918,7 +1918,7 @@ function guardarAusencia(event) {
         cargarAusencias();
       })
       .withFailureHandler(function(err) {
-        ocultarCargando();
+        hideSpinner();
         console.error('[Ausencias][error]', err);
         toast('Error al ejecutar updateAusencia: ' + (err && err.message ? err.message : err), 'danger');
       })
@@ -1928,7 +1928,7 @@ function guardarAusencia(event) {
 
   google.script.run
     .withSuccessHandler(function(resp) {
-      ocultarCargando();
+      hideSpinner();
       console.log('[Ausencias][success]', resp);
       if (!resp || resp.ok === false) {
         toast((resp && resp.error) ? resp.error : 'No se pudo guardar la ausencia', 'danger');
@@ -1939,7 +1939,7 @@ function guardarAusencia(event) {
       cargarAusencias();
     })
     .withFailureHandler(function(err) {
-      ocultarCargando();
+      hideSpinner();
       console.error('[Ausencias][error]', err);
       toast('Error al ejecutar createAusencia: ' + (err && err.message ? err.message : err), 'danger');
     })
