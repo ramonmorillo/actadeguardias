@@ -52,49 +52,55 @@ function ensureAusenciasSheet() {
   }
 }
 
-function getAusencias(params) {
-  Logger.log('[Ausencias][getAusencias] inicio params=%s', JSON.stringify(params || {}));
+function getAusencias(filtros) {
   try {
-    var ensured = ensureAusenciasSheet();
-    if (!ensured.ok) return ensured;
+    Logger.log('[Ausencias][getAusencias] inicio');
 
-    var p = params || {};
-    var normalized = _normalizeAusenciasFilters_(p);
-    var rows = _readAusenciasRowsFormatted_();
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName('Ausencias');
 
-    var filtered = rows.filter(function(item) {
-      if (normalized.estado && (item.estado || '').toLowerCase() !== normalized.estado) return false;
-      if (normalized.personaAusente && (item.personaAusente || '').toLowerCase().indexOf(normalized.personaAusente) === -1) return false;
-      if (normalized.personaSustituta && (item.personaSustituta || '').toLowerCase().indexOf(normalized.personaSustituta) === -1) return false;
+    if (!sheet) {
+      return {
+        ok: true,
+        data: [],
+        message: 'No existe hoja Ausencias todavía'
+      };
+    }
 
-      var fi = _ausenciasDateTime_(item.fechaInicioRaw || item.fechaInicio);
-      if (normalized.fechaDesde && (!fi || fi < normalized.fechaDesde)) return false;
-      if (normalized.fechaHasta && (!fi || fi > normalized.fechaHasta)) return false;
-      return true;
-    });
+    var values = sheet.getDataRange().getValues();
 
-    filtered.sort(function(a, b) {
-      var da = _ausenciasDateTime_(a.fechaInicioRaw || a.fechaInicio);
-      var db = _ausenciasDateTime_(b.fechaInicioRaw || b.fechaInicio);
-      var ta = da ? da.getTime() : 0;
-      var tb = db ? db.getTime() : 0;
-      return tb - ta;
-    });
+    if (!values || values.length <= 1) {
+      return {
+        ok: true,
+        data: [],
+        message: 'Sin ausencias registradas'
+      };
+    }
 
-    var cleanData = filtered.map(function(item) {
-      var out = {};
-      AUSENCIAS_HEADERS.forEach(function(h) {
-        if (h !== 'fechaInicioRaw' && h !== 'fechaFinRaw') out[h] = item[h];
+    var headers = values[0];
+    var rows = values.slice(1);
+
+    var data = rows.map(function(row) {
+      var obj = {};
+      headers.forEach(function(header, index) {
+        obj[header] = row[index];
       });
-      return out;
+      return obj;
     });
-    var response = _ausenciasOk_(cleanData);
-    Logger.log('[Ausencias][getAusencias] retorno ok total=%s', cleanData.length);
-    return response;
-  } catch (e) {
-    Logger.log('[Ausencias][getAusencias] error=%s', e && e.stack ? e.stack : e);
-    _ausenciasLogErr_('getAusencias', e);
-    return _ausenciasFail_(e && e.message ? e.message : String(e));
+
+    return {
+      ok: true,
+      data: data,
+      message: 'Ausencias cargadas correctamente'
+    };
+
+  } catch (error) {
+    Logger.log('[Ausencias][getAusencias][ERROR] ' + String(error && error.message ? error.message : error));
+
+    return {
+      ok: false,
+      error: String(error && error.message ? error.message : error)
+    };
   }
 }
 
@@ -128,76 +134,111 @@ function getAusenciasPorRango(fechaDesde, fechaHasta) {
   return getAusencias({ fechaDesde: fechaDesde, fechaHasta: fechaHasta });
 }
 
-function createAusencia(data) {
-  Logger.log('[Ausencias][createAusencia] inicio');
-  Logger.log('[Ausencias][createAusencia] payload=%s', JSON.stringify(data || {}));
+function createAusencia(payload) {
   try {
-    var ensured = ensureAusenciasSheet();
-    if (!ensured.ok) return ensured;
+    Logger.log('[Ausencias][createAusencia] inicio');
+    Logger.log(JSON.stringify(payload));
 
-    var payload = data || {};
-    var personaAusente = (payload.personaAusente || '').toString().trim();
-    var fechaInicio = _parseDateValue_(payload.fechaInicio);
-    var fechaFin = _parseDateValue_(payload.fechaFin);
-    if (!personaAusente) return _ausenciasFail_('personaAusente es obligatoria.');
-    if (!fechaInicio || !fechaFin) {
-      return _ausenciasFail_('fechaInicio o fechaFin no tiene formato válido');
+    if (!payload) {
+      throw new Error('Payload vacío');
     }
-    if (fechaFin.getTime() < fechaInicio.getTime()) return _ausenciasFail_('fechaFin no puede ser anterior a fechaInicio.');
+
+    if (!payload.personaAusente) {
+      throw new Error('Persona ausente obligatoria');
+    }
+
+    if (!payload.fechaInicio) {
+      throw new Error('Fecha inicio obligatoria');
+    }
+
+    if (!payload.fechaFin) {
+      throw new Error('Fecha fin obligatoria');
+    }
+
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName('Ausencias');
+
+    if (!sheet) {
+      sheet = ss.insertSheet('Ausencias');
+      sheet.appendRow([
+        'id',
+        'personaAusente',
+        'fechaInicio',
+        'fechaFin',
+        'tipoAusencia',
+        'sustituto',
+        'observaciones',
+        'estado',
+        'createdAt',
+        'updatedAt'
+      ]);
+    }
 
     var now = new Date();
-    var id = (payload.id || '').toString().trim() || Utilities.getUuid();
-    var creadoPor = _resolveCurrentUser_();
-
-    var record = {
-      id: id,
-      personaAusente: personaAusente,
-      fechaInicio: fechaInicio,
-      fechaFin: fechaFin,
-      tipoAusencia: (payload.tipoAusencia || '').toString().trim(),
-      personaSustituta: (payload.personaSustituta || '').toString().trim(),
-      observaciones: (payload.observaciones || '').toString().trim(),
-      estado: (payload.estado || 'activa').toString().trim() || 'activa',
-      creadoPor: creadoPor,
+    var ausencia = {
+      id: Utilities.getUuid(),
+      personaAusente: payload.personaAusente || '',
+      fechaInicio: payload.fechaInicio || '',
+      fechaFin: payload.fechaFin || '',
+      tipoAusencia: payload.tipoAusencia || '',
+      sustituto: payload.sustituto || '',
+      observaciones: payload.observaciones || '',
+      estado: payload.estado || 'activa',
       createdAt: now,
       updatedAt: now
     };
 
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(AUSENCIAS_SHEET_NAME);
-    var row = AUSENCIAS_HEADERS.map(function(h) { return record[h] !== undefined ? record[h] : ''; });
+    sheet.appendRow([
+      ausencia.id,
+      ausencia.personaAusente,
+      ausencia.fechaInicio,
+      ausencia.fechaFin,
+      ausencia.tipoAusencia,
+      ausencia.sustituto,
+      ausencia.observaciones,
+      ausencia.estado,
+      ausencia.createdAt,
+      ausencia.updatedAt
+    ]);
 
-    var writeRow = [];
-    for (var c = 1; c <= sheet.getLastColumn(); c++) {
-      var headerName = (sheet.getRange(1, c).getValue() || '').toString();
-      var idx = AUSENCIAS_HEADERS.indexOf(headerName);
-      writeRow.push(idx >= 0 ? row[idx] : '');
-    }
+    Logger.log('[Ausencias][createAusencia] guardada correctamente');
 
-    sheet.appendRow(writeRow);
-    Logger.log('[Ausencias][createAusencia] fila guardada id=%s', id);
-    return _ausenciasOk_(record, 'Ausencia guardada correctamente');
-  } catch (e) {
-    Logger.log('[Ausencias][createAusencia] error=%s', e && e.stack ? e.stack : e);
-    _ausenciasLogErr_('createAusencia', e);
-    return _ausenciasFail_(e && e.message ? e.message : String(e));
+    return {
+      ok: true,
+      data: ausencia,
+      message: 'Ausencia guardada correctamente'
+    };
+
+  } catch (error) {
+    Logger.log('[Ausencias][createAusencia][ERROR] ' + String(error && error.message ? error.message : error));
+
+    return {
+      ok: false,
+      error: String(error && error.message ? error.message : error)
+    };
   }
 }
 
-function testAusenciasBackend() {
+function testAusenciasBackendManual() {
   var payload = {
     personaAusente: 'TEST',
     fechaInicio: '2026-04-30',
     fechaFin: '2026-05-01',
     tipoAusencia: 'TEST',
-    sustituto: '',
-    observaciones: 'Prueba backend'
+    sustituto: 'TEST',
+    observaciones: 'Prueba manual'
   };
   var created = createAusencia(payload);
-  var list = getAusencias({});
+  var listed = getAusencias({});
+  Logger.log(JSON.stringify({
+    created: created,
+    listed: listed
+  }));
+
   return {
     ok: true,
     created: created,
-    list: list
+    listed: listed
   };
 }
 
