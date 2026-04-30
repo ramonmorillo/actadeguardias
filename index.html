@@ -1820,6 +1820,7 @@ function cargarAusencias() {
     .withSuccessHandler(function(rawResp) {
       hideSpinner();
       try {
+        console.log('[Ausencias][list raw]', rawResp, typeof rawResp);
         var resp = parseAusenciasResponse(rawResp);
         console.log('[Ausencias][backend getAusencias parsed]', resp);
         if (!resp || resp.ok !== true) {
@@ -1840,7 +1841,7 @@ function cargarAusencias() {
       toast('No se pudieron cargar las ausencias', 'danger');
       renderAusencias([]);
     })
-    .getAusencias(filtros);
+    .ausenciasListClient(filtros || {});
 }
 
 function renderAusencias(lista) {
@@ -1970,6 +1971,11 @@ function guardarAusencia(event) {
   google.script.run
     .withSuccessHandler(function(rawResp) {
       hideSpinner();
+      console.log('[Ausencias][create raw]', rawResp, typeof rawResp);
+      if (rawResp === null) {
+        toast('Error: ausenciasCreateClient devolvió null', 'danger');
+        return;
+      }
       var resp = parseAusenciasResponse(rawResp);
       console.log('[Ausencias][success parsed]', resp);
       if (resp.ok !== true) {
@@ -1985,7 +1991,7 @@ function guardarAusencia(event) {
       console.error('[Ausencias][error]', err);
       toast('Error al ejecutar createAusencia: ' + (err && err.message ? err.message : err), 'danger');
     })
-    .createAusencia(payload);
+    .ausenciasCreateClient(payload);
 }
 
 function editarAusencia(id) {
