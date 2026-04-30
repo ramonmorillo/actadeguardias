@@ -1864,11 +1864,20 @@ function renderTablaAusencias(lista) {
 
 function guardarAusencia(event) {
   if (event && typeof event.preventDefault === 'function') event.preventDefault();
+  console.log('[Ausencias] click guardar detectado');
 
-  var id = document.getElementById('aus-id').value;
-  var personaAusente = document.getElementById('ausenciaPersonaAusente').value.trim();
-  var fechaInicio = document.getElementById('aus-fecha-inicio').value;
-  var fechaFin = document.getElementById('aus-fecha-fin').value;
+  function getFieldValue(ids) {
+    for (var i = 0; i < ids.length; i++) {
+      var el = document.getElementById(ids[i]);
+      if (el) return (el.value || '').trim();
+    }
+    return '';
+  }
+
+  var id = getFieldValue(['aus-id']);
+  var personaAusente = getFieldValue(['ausenciaPersonaAusente', 'personaAusente']);
+  var fechaInicio = getFieldValue(['aus-fecha-inicio', 'fechaInicioAusencia']);
+  var fechaFin = getFieldValue(['aus-fecha-fin', 'fechaFinAusencia']);
 
   if (!personaAusente) {
     toast('La persona ausente es obligatoria.', 'warning');
@@ -1887,9 +1896,9 @@ function guardarAusencia(event) {
     personaAusente: personaAusente,
     fechaInicio: fechaInicio,
     fechaFin: fechaFin,
-    tipoAusencia: document.getElementById('aus-tipo').value.trim(),
-    personaSustituta: document.getElementById('ausenciaPersonaSustituta').value.trim(),
-    observaciones: document.getElementById('aus-observaciones').value.trim()
+    tipoAusencia: getFieldValue(['aus-tipo', 'tipoAusencia']),
+    personaSustituta: getFieldValue(['ausenciaPersonaSustituta', 'sustitutoAusencia']),
+    observaciones: getFieldValue(['aus-observaciones', 'observacionesAusencia'])
   };
   console.log('[Ausencias][payload]', payload);
 
@@ -1897,11 +1906,11 @@ function guardarAusencia(event) {
 
   if (id) {
     google.script.run
-      .withSuccessHandler(function(res) {
+      .withSuccessHandler(function(resp) {
         ocultarCargando();
-        console.log('[Ausencias][updateAusencia response]', res);
-        if (!res || res.ok === false) {
-          toast((res && res.error) ? res.error : 'No se pudo guardar la ausencia', 'danger');
+        console.log('[Ausencias][success]', resp);
+        if (!resp || resp.ok === false) {
+          toast((resp && resp.error) ? resp.error : 'No se pudo guardar la ausencia', 'danger');
           return;
         }
         toast('Ausencia guardada', 'success');
@@ -1910,7 +1919,7 @@ function guardarAusencia(event) {
       })
       .withFailureHandler(function(err) {
         ocultarCargando();
-        console.error('[Ausencias][updateAusencia failure]', err);
+        console.error('[Ausencias][error]', err);
         toast('Error al ejecutar updateAusencia: ' + (err && err.message ? err.message : err), 'danger');
       })
       .updateAusencia(id, payload);
@@ -1918,11 +1927,11 @@ function guardarAusencia(event) {
   }
 
   google.script.run
-    .withSuccessHandler(function(res) {
+    .withSuccessHandler(function(resp) {
       ocultarCargando();
-      console.log('[Ausencias][createAusencia response]', res);
-      if (!res || res.ok === false) {
-        toast((res && res.error) ? res.error : 'No se pudo guardar la ausencia', 'danger');
+      console.log('[Ausencias][success]', resp);
+      if (!resp || resp.ok === false) {
+        toast((resp && resp.error) ? resp.error : 'No se pudo guardar la ausencia', 'danger');
         return;
       }
       toast('Ausencia guardada', 'success');
@@ -1931,7 +1940,7 @@ function guardarAusencia(event) {
     })
     .withFailureHandler(function(err) {
       ocultarCargando();
-      console.error('[Ausencias][createAusencia failure]', err);
+      console.error('[Ausencias][error]', err);
       toast('Error al ejecutar createAusencia: ' + (err && err.message ? err.message : err), 'danger');
     })
     .createAusencia(payload);
