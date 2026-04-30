@@ -207,6 +207,11 @@
             <i class="bi bi-graph-up me-1"></i>Estadísticas
           </a>
         </li>
+        <li class="nav-item">
+          <a class="nav-link" href="#" id="nav-ausencias" onclick="showView('ausencias')">
+            <i class="bi bi-person-x me-1"></i>Ausencias
+          </a>
+        </li>
         <li class="nav-item" id="nav-item-usuarios" style="display:none;">
           <a class="nav-link" href="#" id="nav-usuarios" onclick="showView('usuarios')">
             <i class="bi bi-people me-1"></i>Usuarios
@@ -858,6 +863,57 @@
 
   </div>
 
+  <!-- AUSENCIAS -->
+  <div id="view-ausencias" class="view">
+    <div class="vista-header">
+      <h4><i class="bi bi-person-x-fill text-primary me-1"></i>Ausencias</h4>
+    </div>
+    <div class="privacy-notice mb-3">
+      Funcionalidad para organización interna del personal. No introducir datos de pacientes ni identificadores clínicos.
+    </div>
+    <div class="card border-0 shadow-sm mb-3" style="border-radius:8px;">
+      <div class="card-header bg-transparent border-bottom fw-semibold py-2">Nueva ausencia</div>
+      <div class="card-body">
+        <input type="hidden" id="aus-id">
+        <div class="row g-2">
+          <div class="col-sm-4"><label class="form-label">Persona ausente *</label><input type="text" class="form-control" id="aus-persona-ausente"></div>
+          <div class="col-sm-2"><label class="form-label">Fecha inicio *</label><input type="date" class="form-control" id="aus-fecha-inicio"></div>
+          <div class="col-sm-2"><label class="form-label">Fecha fin *</label><input type="date" class="form-control" id="aus-fecha-fin"></div>
+          <div class="col-sm-2"><label class="form-label">Tipo ausencia</label><input type="text" class="form-control" id="aus-tipo"></div>
+          <div class="col-sm-2"><label class="form-label">Sustituta/o</label><input type="text" class="form-control" id="aus-persona-sustituta"></div>
+          <div class="col-12"><label class="form-label">Observaciones</label><textarea class="form-control" id="aus-observaciones" rows="2"></textarea></div>
+          <div class="col-12 d-flex gap-2 justify-content-end">
+            <button class="btn btn-outline-secondary" onclick="limpiarFormularioAusencias()">Limpiar</button>
+            <button class="btn btn-primary" onclick="guardarAusencia()"><i class="bi bi-floppy me-1"></i>Guardar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card border-0 shadow-sm mb-3" style="border-radius:8px;">
+      <div class="card-header bg-transparent border-bottom fw-semibold py-2">Filtros</div>
+      <div class="card-body">
+        <div class="row g-2 align-items-end">
+          <div class="col-sm-2"><label class="form-label">Estado</label><select class="form-select" id="aus-f-estado"><option value="">Todos</option><option value="activa">Activa</option><option value="cancelada">Cancelada</option></select></div>
+          <div class="col-sm-3"><label class="form-label">Persona</label><input type="text" class="form-control" id="aus-f-persona"></div>
+          <div class="col-sm-2"><label class="form-label">Fecha desde</label><input type="date" class="form-control" id="aus-f-desde"></div>
+          <div class="col-sm-2"><label class="form-label">Fecha hasta</label><input type="date" class="form-control" id="aus-f-hasta"></div>
+          <div class="col-sm-3 d-flex gap-2">
+            <button class="btn btn-primary w-100" onclick="cargarAusencias()"><i class="bi bi-funnel me-1"></i>Aplicar</button>
+            <button class="btn btn-outline-secondary w-100" onclick="limpiarFiltrosAusencias()">Limpiar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="table-card">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead><tr><th>Persona ausente</th><th>Fecha inicio</th><th>Fecha fin</th><th>Tipo</th><th>Sustituta/o</th><th>Estado</th><th>Observaciones</th><th>Acciones</th></tr></thead>
+          <tbody id="aus-body"><tr><td colspan="8" class="text-center text-muted py-3">Sin datos</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <!-- USUARIOS (solo admin) -->
   <div id="view-usuarios" class="view">
 
@@ -1341,6 +1397,7 @@ function showView(viewId) {
   else if (viewId === 'busqueda')     initBusqueda();
   else if (viewId === 'informes')     initInformes();
   else if (viewId === 'estadisticas') cargarEstadisticas();
+  else if (viewId === 'ausencias')    cargarAusencias();
   else if (viewId === 'usuarios')     cargarUsuarios();
   else if (viewId === 'catalogos')    cargarCatalogosAdmin();
 }
@@ -1697,6 +1754,100 @@ function poblarSelectoresCatalogos() {
   llenarSelect('inc-filtro-area', areas);
 }
 
+function cargarAusencias() {
+  var filtros = {
+    estado: document.getElementById('aus-f-estado').value || '',
+    personaAusente: document.getElementById('aus-f-persona').value || '',
+    fechaDesde: document.getElementById('aus-f-desde').value || '',
+    fechaHasta: document.getElementById('aus-f-hasta').value || ''
+  };
+  llamar('getAusencias', [filtros], 'Cargando ausencias…', function(data) {
+    renderTablaAusencias(data || []);
+  });
+}
+
+function renderTablaAusencias(rows) {
+  var body = document.getElementById('aus-body');
+  if (!rows.length) {
+    body.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">Sin ausencias registradas</td></tr>';
+    return;
+  }
+  body.innerHTML = rows.map(function(r) {
+    return '<tr>' +
+      '<td>' + escHtml(r.personaAusente || '—') + '</td>' +
+      '<td>' + fmtD(r.fechaInicio) + '</td>' +
+      '<td>' + fmtD(r.fechaFin) + '</td>' +
+      '<td>' + escHtml(r.tipoAusencia || '—') + '</td>' +
+      '<td>' + escHtml(r.personaSustituta || '—') + '</td>' +
+      '<td>' + escHtml(r.estado || '—') + '</td>' +
+      '<td>' + escHtml(r.observaciones || '—') + '</td>' +
+      '<td><div class="btn-group btn-group-sm">' +
+      '<button class="btn btn-outline-primary" onclick="editarAusencia(' + "'" + escJs(r.id || '') + "'" + ')"><i class="bi bi-pencil"></i></button>' +
+      '<button class="btn btn-outline-danger" onclick="cancelarAusencia(' + "'" + escJs(r.id || '') + "'" + ')"><i class="bi bi-x-circle"></i></button>' +
+      '</div></td></tr>';
+  }).join('');
+  APP.ausenciasRows = rows;
+}
+
+function guardarAusencia() {
+  var id = document.getElementById('aus-id').value;
+  var payload = {
+    personaAusente: document.getElementById('aus-persona-ausente').value.trim(),
+    fechaInicio: document.getElementById('aus-fecha-inicio').value,
+    fechaFin: document.getElementById('aus-fecha-fin').value,
+    tipoAusencia: document.getElementById('aus-tipo').value.trim(),
+    personaSustituta: document.getElementById('aus-persona-sustituta').value.trim(),
+    observaciones: document.getElementById('aus-observaciones').value.trim()
+  };
+  var fn = id ? 'updateAusencia' : 'createAusencia';
+  var args = id ? [id, payload] : [payload];
+  llamar(fn, args, 'Guardando ausencia…', function() {
+    toast('Ausencia guardada correctamente.', 'success');
+    limpiarFormularioAusencias();
+    cargarAusencias();
+  });
+}
+
+function editarAusencia(id) {
+  var row = (APP.ausenciasRows || []).find(function(r) { return r.id === id; });
+  if (!row) return;
+  document.getElementById('aus-id').value = row.id || '';
+  document.getElementById('aus-persona-ausente').value = row.personaAusente || '';
+  document.getElementById('aus-fecha-inicio').value = toInputDate(row.fechaInicio);
+  document.getElementById('aus-fecha-fin').value = toInputDate(row.fechaFin);
+  document.getElementById('aus-tipo').value = row.tipoAusencia || '';
+  document.getElementById('aus-persona-sustituta').value = row.personaSustituta || '';
+  document.getElementById('aus-observaciones').value = row.observaciones || '';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function cancelarAusencia(id) {
+  confirmar('Cancelar ausencia', 'Se marcará la ausencia como cancelada.', function() {
+    llamar('deleteAusencia', [id], 'Cancelando ausencia…', function() {
+      toast('Ausencia cancelada.', 'success');
+      cargarAusencias();
+    });
+  });
+}
+
+function limpiarFormularioAusencias() {
+  ['aus-id','aus-persona-ausente','aus-fecha-inicio','aus-fecha-fin','aus-tipo','aus-persona-sustituta','aus-observaciones'].forEach(function(id){ document.getElementById(id).value = ''; });
+}
+
+function limpiarFiltrosAusencias() {
+  ['aus-f-estado','aus-f-persona','aus-f-desde','aus-f-hasta'].forEach(function(id){ document.getElementById(id).value = ''; });
+  cargarAusencias();
+}
+
+function toInputDate(v) {
+  if (!v) return '';
+  var d = new Date(v);
+  if (isNaN(d.getTime())) return '';
+  var m = String(d.getMonth() + 1).padStart(2, '0');
+  var day = String(d.getDate()).padStart(2, '0');
+  return d.getFullYear() + '-' + m + '-' + day;
+}
+
 function abrirModalPassword() {
   document.getElementById('pwd-nueva').value   = '';
   document.getElementById('pwd-repite').value  = '';
@@ -2043,6 +2194,10 @@ function imprimirParte() {
 function escHtml(s) {
   if (!s) return '';
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function escJs(s) {
+  return (s || '').toString().replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 }
 
 function cerrarParte() {
