@@ -876,11 +876,11 @@
       <div class="card-body">
         <input type="hidden" id="aus-id">
         <div class="row g-2">
-          <div class="col-sm-4"><label class="form-label">Persona ausente *</label><input type="text" class="form-control" id="aus-persona-ausente"></div>
+          <div class="col-sm-4"><label class="form-label">Persona ausente *</label><select class="form-select" id="aus-persona-ausente"><option value="">Seleccionar...</option></select><input type="text" class="form-control mt-1" id="aus-persona-ausente-manual" style="display:none;" placeholder="Persona ausente"></div>
           <div class="col-sm-2"><label class="form-label">Fecha inicio *</label><input type="date" class="form-control" id="aus-fecha-inicio"></div>
           <div class="col-sm-2"><label class="form-label">Fecha fin *</label><input type="date" class="form-control" id="aus-fecha-fin"></div>
           <div class="col-sm-2"><label class="form-label">Tipo ausencia</label><input type="text" class="form-control" id="aus-tipo"></div>
-          <div class="col-sm-2"><label class="form-label">Sustituta/o</label><input type="text" class="form-control" id="aus-persona-sustituta"></div>
+          <div class="col-sm-2"><label class="form-label">Sustituta/o</label><select class="form-select" id="aus-persona-sustituta"><option value="">Seleccionar...</option></select><input type="text" class="form-control mt-1" id="aus-persona-sustituta-manual" style="display:none;" placeholder="Sustituta/o"></div>
           <div class="col-12"><label class="form-label">Observaciones</label><textarea class="form-control" id="aus-observaciones" rows="2"></textarea></div>
           <div class="col-12 d-flex gap-2 justify-content-end">
             <button class="btn btn-outline-secondary" onclick="limpiarFormularioAusencias()">Limpiar</button>
@@ -1397,7 +1397,7 @@ function showView(viewId) {
   else if (viewId === 'busqueda')     initBusqueda();
   else if (viewId === 'informes')     initInformes();
   else if (viewId === 'estadisticas') cargarEstadisticas();
-  else if (viewId === 'ausencias')    cargarAusencias();
+  else if (viewId === 'ausencias')    { cargarUsuariosParaAusencias(); cargarAusencias(); }
   else if (viewId === 'usuarios')     cargarUsuarios();
   else if (viewId === 'catalogos')    cargarCatalogosAdmin();
 }
@@ -1754,6 +1754,45 @@ function poblarSelectoresCatalogos() {
   llenarSelect('inc-filtro-area', areas);
 }
 
+function cargarUsuariosParaAusencias() {
+  llamar('getUsuariosParaAusencias', [], null, function(usuarios) {
+    poblarSelectUsuariosAusencias(usuarios || []);
+    setModoManualAusencias(false);
+  }, function() {
+    setModoManualAusencias(true);
+    toast('No se pudo cargar el listado de usuarios. Se mantiene entrada manual.', 'warning');
+  });
+}
+
+function poblarSelectUsuariosAusencias(usuarios) {
+  var ausente = document.getElementById('aus-persona-ausente');
+  var sustituta = document.getElementById('aus-persona-sustituta');
+  var base = '<option value="">Seleccionar...</option>';
+  var opts = (usuarios || []).map(function(u) {
+    var nombre = (u && u.nombre ? u.nombre : '').toString();
+    return nombre ? '<option value="' + escHtml(nombre) + '">' + escHtml(nombre) + '</option>' : '';
+  }).join('');
+  ausente.innerHTML = base + opts;
+  sustituta.innerHTML = base + opts;
+}
+
+function setModoManualAusencias(manual) {
+  document.getElementById('aus-persona-ausente').style.display = manual ? 'none' : '';
+  document.getElementById('aus-persona-sustituta').style.display = manual ? 'none' : '';
+  document.getElementById('aus-persona-ausente-manual').style.display = manual ? '' : 'none';
+  document.getElementById('aus-persona-sustituta-manual').style.display = manual ? '' : 'none';
+}
+
+function valorPersonaAusenteFormulario() {
+  var manual = document.getElementById('aus-persona-ausente-manual').style.display !== 'none';
+  return manual ? document.getElementById('aus-persona-ausente-manual').value.trim() : (document.getElementById('aus-persona-ausente').value || '').trim();
+}
+
+function valorPersonaSustitutaFormulario() {
+  var manual = document.getElementById('aus-persona-sustituta-manual').style.display !== 'none';
+  return manual ? document.getElementById('aus-persona-sustituta-manual').value.trim() : (document.getElementById('aus-persona-sustituta').value || '').trim();
+}
+
 function cargarAusencias() {
   var filtros = {
     estado: document.getElementById('aus-f-estado').value || '',
@@ -1792,11 +1831,11 @@ function renderTablaAusencias(rows) {
 function guardarAusencia() {
   var id = document.getElementById('aus-id').value;
   var payload = {
-    personaAusente: document.getElementById('aus-persona-ausente').value.trim(),
+    personaAusente: valorPersonaAusenteFormulario(),
     fechaInicio: document.getElementById('aus-fecha-inicio').value,
     fechaFin: document.getElementById('aus-fecha-fin').value,
     tipoAusencia: document.getElementById('aus-tipo').value.trim(),
-    personaSustituta: document.getElementById('aus-persona-sustituta').value.trim(),
+    personaSustituta: valorPersonaSustitutaFormulario(),
     observaciones: document.getElementById('aus-observaciones').value.trim()
   };
   var fn = id ? 'updateAusencia' : 'createAusencia';
@@ -1813,10 +1852,12 @@ function editarAusencia(id) {
   if (!row) return;
   document.getElementById('aus-id').value = row.id || '';
   document.getElementById('aus-persona-ausente').value = row.personaAusente || '';
+  document.getElementById('aus-persona-ausente-manual').value = row.personaAusente || '';
   document.getElementById('aus-fecha-inicio').value = toInputDate(row.fechaInicio);
   document.getElementById('aus-fecha-fin').value = toInputDate(row.fechaFin);
   document.getElementById('aus-tipo').value = row.tipoAusencia || '';
   document.getElementById('aus-persona-sustituta').value = row.personaSustituta || '';
+  document.getElementById('aus-persona-sustituta-manual').value = row.personaSustituta || '';
   document.getElementById('aus-observaciones').value = row.observaciones || '';
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -1831,7 +1872,7 @@ function cancelarAusencia(id) {
 }
 
 function limpiarFormularioAusencias() {
-  ['aus-id','aus-persona-ausente','aus-fecha-inicio','aus-fecha-fin','aus-tipo','aus-persona-sustituta','aus-observaciones'].forEach(function(id){ document.getElementById(id).value = ''; });
+  ['aus-id','aus-persona-ausente','aus-persona-ausente-manual','aus-fecha-inicio','aus-fecha-fin','aus-tipo','aus-persona-sustituta','aus-persona-sustituta-manual','aus-observaciones'].forEach(function(id){ document.getElementById(id).value = ''; });
 }
 
 function limpiarFiltrosAusencias() {
