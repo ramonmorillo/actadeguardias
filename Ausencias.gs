@@ -233,12 +233,15 @@ function debugAusenciasContrato() {
   var created = createAusencia(testPayload);
   var listed = getAusencias({});
 
-  return {
+  var resultado = {
     ok: true,
     source: 'debugAusenciasContrato_VERSION_FIX_20260430',
     created: created,
     listed: listed
   };
+
+  Logger.log(JSON.stringify(resultado, null, 2));
+  return resultado;
 }
 
 function updateAusencia(id, data) {
