@@ -42,7 +42,7 @@ function ensureAusenciasSheet() {
     var refreshCols = Math.max(sheet.getLastColumn(), AUSENCIAS_HEADERS.length);
     var refreshedHeaders = sheet.getRange(1, 1, 1, refreshCols).getValues()[0];
     if (sheet.getFrozenRows() < 1) sheet.setFrozenRows(1);
-    if (!rowHasContent(refreshedHeaders)) {
+    if (!_ausenciasRowHasContent_(refreshedHeaders)) {
       sheet.getRange(1, 1, 1, AUSENCIAS_HEADERS.length).setValues([AUSENCIAS_HEADERS]);
     }
     return ok({ sheetName: AUSENCIAS_SHEET_NAME, headers: refreshedHeaders });
@@ -231,7 +231,7 @@ function _readAusenciasRows_() {
   var schema = _getAusenciasHeaderMap_(sheet);
   var rows = [];
   for (var i = 1; i < values.length; i++) {
-    if (!rowHasContent(values[i])) continue;
+    if (!_ausenciasRowHasContent_(values[i])) continue;
     rows.push(_rowToAusencia_(values[i], schema));
   }
   return rows;
@@ -286,4 +286,11 @@ function _resolveCurrentUser_() {
     }
   } catch (e) {}
   return 'Sistema';
+}
+
+function _ausenciasRowHasContent_(row) {
+  if (!row || !row.length) return false;
+  return row.some(function(cell) {
+    return cell !== null && cell !== undefined && cell.toString().trim() !== '';
+  });
 }
