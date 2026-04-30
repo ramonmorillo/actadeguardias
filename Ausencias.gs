@@ -223,6 +223,71 @@ function deleteAusencia(id) {
   }
 }
 
+
+function getUsuariosParaAusencias() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName('Usuarios');
+    if (!sheet) return fail('No se encontró la hoja Usuarios.');
+
+    var values = sheet.getDataRange().getValues();
+    if (!values || values.length <= 1) return ok([]);
+
+    var headers = values[0] || [];
+    var map = {};
+    for (var i = 0; i < headers.length; i++) {
+      var key = normalizeHeaderKey(headers[i]);
+      if (key) map[key] = i;
+    }
+
+    function pickIndex(aliases) {
+      for (var j = 0; j < aliases.length; j++) {
+        var idx = map[normalizeHeaderKey(aliases[j])];
+        if (idx !== undefined) return idx;
+      }
+      return -1;
+    }
+
+    var idxNombre = pickIndex(['nombre', 'Nombre', 'profesional', 'Profesional']);
+    var idxEmail = pickIndex(['email', 'Email']);
+    var idxActivo = pickIndex(['activo', 'Activo']);
+
+    if (idxNombre === -1 && idxEmail === -1) {
+      return fail('No se encontraron columnas de nombre/profesional ni email en Usuarios.');
+    }
+
+    var data = [];
+    for (var r = 1; r < values.length; r++) {
+      var row = values[r];
+      var nombre = idxNombre >= 0 ? (row[idxNombre] || '').toString().trim() : '';
+      var email = idxEmail >= 0 ? (row[idxEmail] || '').toString().trim() : '';
+      if (!nombre && !email) continue;
+
+      var activo = true;
+      if (idxActivo >= 0) {
+        var raw = row[idxActivo];
+        if (typeof raw === 'boolean') activo = raw;
+        else {
+          var norm = (raw || '').toString().trim().toLowerCase();
+          activo = ['1', 'true', 'sí', 'si', 's', 'activo', 'activa', 'yes'].indexOf(norm) !== -1;
+        }
+      }
+      if (idxActivo >= 0 && !activo) continue;
+
+      data.push({ nombre: nombre || email, email: email, activo: activo });
+    }
+
+    data.sort(function(a, b) {
+      return (a.nombre || '').localeCompare((b.nombre || ''), 'es', { sensitivity: 'base' });
+    });
+
+    return ok(data);
+  } catch (e) {
+    logErr('getUsuariosParaAusencias', e);
+    return fail('No se pudo obtener el listado de usuarios para Ausencias: ' + e.message);
+  }
+}
+
 function _readAusenciasRows_() {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(AUSENCIAS_SHEET_NAME);
   if (!sheet) return [];
