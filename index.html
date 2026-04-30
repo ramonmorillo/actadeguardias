@@ -1809,16 +1809,17 @@ function cargarAusencias() {
   };
   showSpinner('Cargando ausencias…');
   var runner = google.script.run
-    .withSuccessHandler(function(res) {
+    .withSuccessHandler(function(rawResp) {
       hideSpinner();
       try {
-        console.log('[Ausencias][backend getAusencias]', res);
-        if (!res || res.ok !== true) {
-          toast((res && res.error) ? res.error : 'No se pudieron cargar las ausencias', 'danger');
+        var resp = parseAusenciasResponse(rawResp);
+        console.log('[Ausencias][backend getAusencias parsed]', resp);
+        if (!resp || resp.ok !== true) {
+          toast((resp && resp.error) ? resp.error : 'No se pudieron cargar las ausencias', 'danger');
           renderAusencias([]);
           return;
         }
-        renderAusencias(Array.isArray(res.data) ? res.data : []);
+        renderAusencias(Array.isArray(resp.data) ? resp.data : []);
       } catch (e) {
         console.error('[Ausencias][getAusencias successHandler]', e);
         renderAusencias([]);
@@ -1867,6 +1868,32 @@ function renderTablaAusencias(lista) {
   renderAusencias(lista);
 }
 
+function parseAusenciasResponse(resp) {
+  console.log('[Ausencias][raw response]', resp, typeof resp);
+
+  if (resp === null || resp === undefined) {
+    return {
+      ok: false,
+      success: false,
+      error: 'El backend devolvió null/undefined'
+    };
+  }
+
+  if (typeof resp === 'string') {
+    try {
+      return JSON.parse(resp);
+    } catch (e) {
+      return {
+        ok: false,
+        success: false,
+        error: 'Respuesta backend no es JSON válido: ' + resp
+      };
+    }
+  }
+
+  return resp;
+}
+
 function guardarAusencia(event) {
   if (event && typeof event.preventDefault === 'function') event.preventDefault();
   console.log('[Ausencias] click guardar detectado');
@@ -1911,17 +1938,10 @@ function guardarAusencia(event) {
 
   if (id) {
     google.script.run
-      .withSuccessHandler(function(resp) {
+      .withSuccessHandler(function(rawResp) {
         hideSpinner();
-        console.log('[Ausencias][success]', resp);
-        console.log('[Ausencias][success JSON]', JSON.stringify(resp));
-        if (resp) {
-          console.log('[Ausencias][source]', resp.source);
-        }
-        if (resp == null) {
-          toast('El backend devolvió null. Revisa createAusencia y el despliegue.', 'danger');
-          return;
-        }
+        var resp = parseAusenciasResponse(rawResp);
+        console.log('[Ausencias][success parsed]', resp);
         if (resp.ok !== true) {
           toast((resp && resp.error) ? resp.error : 'No se pudo guardar la ausencia', 'danger');
           return;
@@ -1940,17 +1960,10 @@ function guardarAusencia(event) {
   }
 
   google.script.run
-    .withSuccessHandler(function(resp) {
+    .withSuccessHandler(function(rawResp) {
       hideSpinner();
-      console.log('[Ausencias][success]', resp);
-      console.log('[Ausencias][success JSON]', JSON.stringify(resp));
-      if (resp) {
-        console.log('[Ausencias][source]', resp.source);
-      }
-      if (resp == null) {
-        toast('El backend devolvió null. Revisa createAusencia y el despliegue.', 'danger');
-        return;
-      }
+      var resp = parseAusenciasResponse(rawResp);
+      console.log('[Ausencias][success parsed]', resp);
       if (resp.ok !== true) {
         toast((resp && resp.error) ? resp.error : 'No se pudo guardar la ausencia', 'danger');
         return;
