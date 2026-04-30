@@ -1914,6 +1914,10 @@ function guardarAusencia(event) {
       .withSuccessHandler(function(resp) {
         hideSpinner();
         console.log('[Ausencias][success]', resp);
+        console.log('[Ausencias][success JSON]', JSON.stringify(resp));
+        if (resp) {
+          console.log('[Ausencias][source]', resp.source);
+        }
         if (resp == null) {
           toast('El backend devolvió null. Revisa createAusencia y el despliegue.', 'danger');
           return;
@@ -1939,6 +1943,10 @@ function guardarAusencia(event) {
     .withSuccessHandler(function(resp) {
       hideSpinner();
       console.log('[Ausencias][success]', resp);
+      console.log('[Ausencias][success JSON]', JSON.stringify(resp));
+      if (resp) {
+        console.log('[Ausencias][source]', resp.source);
+      }
       if (resp == null) {
         toast('El backend devolvió null. Revisa createAusencia y el despliegue.', 'danger');
         return;

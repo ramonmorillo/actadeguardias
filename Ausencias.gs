@@ -54,7 +54,7 @@ function ensureAusenciasSheet() {
 
 function getAusencias(filtros) {
   try {
-    Logger.log('[Ausencias][getAusencias] inicio');
+    Logger.log('[Ausencias][getAusencias][VERSION_FIX_20260430] inicio');
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName('Ausencias');
@@ -62,8 +62,9 @@ function getAusencias(filtros) {
     if (!sheet) {
       return {
         ok: true,
+        source: 'getAusencias_VERSION_FIX_20260430',
         data: [],
-        message: 'No existe hoja Ausencias todavía'
+        message: 'Sin ausencias registradas'
       };
     }
 
@@ -72,6 +73,7 @@ function getAusencias(filtros) {
     if (!values || values.length <= 1) {
       return {
         ok: true,
+        source: 'getAusencias_VERSION_FIX_20260430',
         data: [],
         message: 'Sin ausencias registradas'
       };
@@ -90,15 +92,16 @@ function getAusencias(filtros) {
 
     return {
       ok: true,
+      source: 'getAusencias_VERSION_FIX_20260430',
       data: data,
       message: 'Ausencias cargadas correctamente'
     };
-
   } catch (error) {
     Logger.log('[Ausencias][getAusencias][ERROR] ' + String(error && error.message ? error.message : error));
 
     return {
       ok: false,
+      source: 'getAusencias_VERSION_FIX_20260430',
       error: String(error && error.message ? error.message : error)
     };
   }
@@ -136,8 +139,7 @@ function getAusenciasPorRango(fechaDesde, fechaHasta) {
 
 function createAusencia(payload) {
   try {
-    Logger.log('[Ausencias][createAusencia] inicio');
-    Logger.log(JSON.stringify(payload));
+    Logger.log('[Ausencias][createAusencia][VERSION_FIX_20260430] inicio');
 
     if (!payload) {
       throw new Error('Payload vacío');
@@ -181,7 +183,7 @@ function createAusencia(payload) {
       fechaInicio: payload.fechaInicio || '',
       fechaFin: payload.fechaFin || '',
       tipoAusencia: payload.tipoAusencia || '',
-      sustituto: payload.sustituto || '',
+      sustituto: payload.sustituto || payload.personaSustituta || '',
       observaciones: payload.observaciones || '',
       estado: payload.estado || 'activa',
       createdAt: now,
@@ -201,42 +203,39 @@ function createAusencia(payload) {
       ausencia.updatedAt
     ]);
 
-    Logger.log('[Ausencias][createAusencia] guardada correctamente');
-
     return {
       ok: true,
+      source: 'createAusencia_VERSION_FIX_20260430',
       data: ausencia,
       message: 'Ausencia guardada correctamente'
     };
-
   } catch (error) {
     Logger.log('[Ausencias][createAusencia][ERROR] ' + String(error && error.message ? error.message : error));
 
     return {
       ok: false,
+      source: 'createAusencia_VERSION_FIX_20260430',
       error: String(error && error.message ? error.message : error)
     };
   }
 }
 
-function testAusenciasBackendManual() {
-  var payload = {
-    personaAusente: 'TEST',
+function debugAusenciasContrato() {
+  var testPayload = {
+    personaAusente: 'DEBUG CONTRATO',
     fechaInicio: '2026-04-30',
     fechaFin: '2026-05-01',
-    tipoAusencia: 'TEST',
-    sustituto: 'TEST',
-    observaciones: 'Prueba manual'
+    tipoAusencia: 'DEBUG',
+    sustituto: 'DEBUG',
+    observaciones: 'Prueba contrato backend'
   };
-  var created = createAusencia(payload);
+
+  var created = createAusencia(testPayload);
   var listed = getAusencias({});
-  Logger.log(JSON.stringify({
-    created: created,
-    listed: listed
-  }));
 
   return {
     ok: true,
+    source: 'debugAusenciasContrato_VERSION_FIX_20260430',
     created: created,
     listed: listed
   };
