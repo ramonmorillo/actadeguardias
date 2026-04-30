@@ -22,6 +22,15 @@ function _ausenciasToClient_(obj) {
   return JSON.parse(JSON.stringify(_ausenciasNormalizeForClient_(obj)));
 }
 
+function _ausenciasJsonResponse_(obj) {
+  return JSON.stringify(obj, function(key, value) {
+    if (value instanceof Date) {
+      return value.toISOString();
+    }
+    return value;
+  });
+}
+
 function _ausenciasNormalizeForClient_(value) {
   if (value instanceof Date) {
     return value.toISOString();
@@ -94,10 +103,10 @@ function getAusencias(filtros) {
     var sheet = ss.getSheetByName('Ausencias');
 
     if (!sheet) {
-      return _ausenciasToClient_({
+      return _ausenciasJsonResponse_({
         ok: true,
         success: true,
-        source: 'getAusencias_VERSION_FIX_20260430',
+        source: 'getAusencias_JSON_STRING_FIX_20260430',
         data: [],
         error: null,
         message: 'Sin ausencias registradas'
@@ -107,10 +116,10 @@ function getAusencias(filtros) {
     var values = sheet.getDataRange().getValues();
 
     if (!values || values.length <= 1) {
-      return _ausenciasToClient_({
+      return _ausenciasJsonResponse_({
         ok: true,
         success: true,
-        source: 'getAusencias_VERSION_FIX_20260430',
+        source: 'getAusencias_JSON_STRING_FIX_20260430',
         data: [],
         error: null,
         message: 'Sin ausencias registradas'
@@ -134,10 +143,10 @@ function getAusencias(filtros) {
       return obj;
     });
 
-    return _ausenciasToClient_({
+    return _ausenciasJsonResponse_({
       ok: true,
       success: true,
-      source: 'getAusencias_VERSION_FIX_20260430',
+      source: 'getAusencias_JSON_STRING_FIX_20260430',
       data: data || [],
       error: null,
       message: 'Ausencias cargadas correctamente'
@@ -145,11 +154,11 @@ function getAusencias(filtros) {
   } catch (error) {
     Logger.log('[Ausencias][getAusencias][ERROR] ' + String(error && error.message ? error.message : error));
 
-    return _ausenciasToClient_({
+    return _ausenciasJsonResponse_({
       ok: false,
       success: false,
-      source: 'getAusencias_VERSION_FIX_20260430',
-      data: null,
+      source: 'getAusencias_JSON_STRING_FIX_20260430',
+      data: [],
       error: String(error && error.message ? error.message : error),
       message: ''
     });
@@ -252,10 +261,10 @@ function createAusencia(payload) {
       ausencia.updatedAt
     ]);
 
-    return _ausenciasToClient_({
+    return _ausenciasJsonResponse_({
       ok: true,
       success: true,
-      source: 'createAusencia_VERSION_FIX_20260430',
+      source: 'createAusencia_JSON_STRING_FIX_20260430',
       data: ausencia,
       error: null,
       message: 'Ausencia guardada correctamente'
@@ -263,10 +272,10 @@ function createAusencia(payload) {
   } catch (error) {
     Logger.log('[Ausencias][createAusencia][ERROR] ' + String(error && error.message ? error.message : error));
 
-    return _ausenciasToClient_({
+    return _ausenciasJsonResponse_({
       ok: false,
       success: false,
-      source: 'createAusencia_VERSION_FIX_20260430',
+      source: 'createAusencia_JSON_STRING_FIX_20260430',
       data: null,
       error: String(error && error.message ? error.message : error),
       message: ''
