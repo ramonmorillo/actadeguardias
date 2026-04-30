@@ -58,32 +58,61 @@ function getAusencias(params) {
     if (!ensured.ok) return ensured;
 
     var p = params || {};
-    var normalized = _normalizeAusenciasFilters(p);
-    var rows = _readAusenciasRows_();
+    var normalized = _normalizeAusenciasFilters_(p);
+    var rows = _readAusenciasRowsFormatted_();
 
     var filtered = rows.filter(function(item) {
       if (normalized.estado && (item.estado || '').toLowerCase() !== normalized.estado) return false;
       if (normalized.personaAusente && (item.personaAusente || '').toLowerCase().indexOf(normalized.personaAusente) === -1) return false;
       if (normalized.personaSustituta && (item.personaSustituta || '').toLowerCase().indexOf(normalized.personaSustituta) === -1) return false;
 
-      var fi = _parseDateValue_(item.fechaInicio);
+      var fi = _ausenciasDateTime_(item.fechaInicioRaw || item.fechaInicio);
       if (normalized.fechaDesde && (!fi || fi < normalized.fechaDesde)) return false;
       if (normalized.fechaHasta && (!fi || fi > normalized.fechaHasta)) return false;
       return true;
     });
 
     filtered.sort(function(a, b) {
-      var da = _parseDateValue_(a.fechaInicio);
-      var db = _parseDateValue_(b.fechaInicio);
+      var da = _ausenciasDateTime_(a.fechaInicioRaw || a.fechaInicio);
+      var db = _ausenciasDateTime_(b.fechaInicioRaw || b.fechaInicio);
       var ta = da ? da.getTime() : 0;
       var tb = db ? db.getTime() : 0;
       return tb - ta;
     });
 
-    return ok(filtered);
+    var cleanData = filtered.map(function(item) {
+      var out = {};
+      AUSENCIAS_HEADERS.forEach(function(h) {
+        if (h !== 'fechaInicioRaw' && h !== 'fechaFinRaw') out[h] = item[h];
+      });
+      return out;
+    });
+    return _ausenciasOk_(cleanData);
   } catch (e) {
-    logErr('getAusencias', e);
-    return fail('Error al consultar ausencias: ' + e.message);
+    _ausenciasLogErr_('getAusencias', e);
+    return _ausenciasFail_('Error al consultar ausencias: ' + (e && e.message ? e.message : e));
+  }
+}
+
+function diagnosticoAusencias() {
+  try {
+    var ensured = ensureAusenciasSheet();
+    if (!ensured.ok) return ensured;
+
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(AUSENCIAS_SHEET_NAME);
+    var values = sheet.getDataRange().getValues();
+    var headers = values && values.length ? values[0] : [];
+    var rows = _readAusenciasRowsFormatted_();
+
+    return _ausenciasOk_({
+      headers: headers,
+      totalRows: values ? values.length : 0,
+      dataRows: rows.length,
+      sample: rows.length ? rows[0] : null
+    });
+  } catch (e) {
+    _ausenciasLogErr_('diagnosticoAusencias', e);
+    return _ausenciasFail_('Error en diagnóstico de ausencias: ' + (e && e.message ? e.message : e));
   }
 }
 
@@ -367,14 +396,68 @@ function _buildLocalDate_(year, month, day) {
   return date;
 }
 
-function _normalizeAusenciasFilters(params) {
+function _normalizeAusenciasFilters_(params) {
   return {
     estado: (params.estado || '').toString().trim().toLowerCase(),
     personaAusente: (params.personaAusente || '').toString().trim().toLowerCase(),
     personaSustituta: (params.personaSustituta || '').toString().trim().toLowerCase(),
-    fechaDesde: _parseDateValue_(params.fechaDesde),
-    fechaHasta: _parseDateValue_(params.fechaHasta)
+    fechaDesde: _ausenciasDateTime_(params.fechaDesde),
+    fechaHasta: _ausenciasDateTime_(params.fechaHasta)
   };
+}
+
+function _readAusenciasRowsFormatted_() {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(AUSENCIAS_SHEET_NAME);
+  if (!sheet) return [];
+  var values = sheet.getDataRange().getValues();
+  if (!values || values.length <= 1) return [];
+
+  var headers = values[0];
+  var map = {};
+  for (var i = 0; i < headers.length; i++) {
+    map[(headers[i] || '').toString().trim()] = i;
+  }
+
+  var tz = Session.getScriptTimeZone();
+  var rows = [];
+  for (var r = 1; r < values.length; r++) {
+    var row = values[r];
+    if (!_ausenciasRowHasContent_(row)) continue;
+    var obj = {};
+    AUSENCIAS_HEADERS.forEach(function(h) {
+      var idx = map[h];
+      obj[h] = idx !== undefined ? row[idx] : '';
+    });
+    var fi = _ausenciasDateTime_(obj.fechaInicio);
+    var ff = _ausenciasDateTime_(obj.fechaFin);
+    var ca = _ausenciasDateTime_(obj.createdAt);
+    var ua = _ausenciasDateTime_(obj.updatedAt);
+    obj.fechaInicioRaw = fi;
+    obj.fechaFinRaw = ff;
+    obj.fechaInicio = fi ? Utilities.formatDate(fi, tz, 'dd/MM/yyyy') : '';
+    obj.fechaFin = ff ? Utilities.formatDate(ff, tz, 'dd/MM/yyyy') : '';
+    obj.createdAt = ca ? Utilities.formatDate(ca, tz, 'dd/MM/yyyy HH:mm') : '';
+    obj.updatedAt = ua ? Utilities.formatDate(ua, tz, 'dd/MM/yyyy HH:mm') : '';
+    rows.push(obj);
+  }
+  return rows;
+}
+
+function _ausenciasDateTime_(value) {
+  return _parseDateValue_(value);
+}
+
+function _ausenciasOk_(data, message) {
+  return { ok: true, data: data, message: message || '' };
+}
+
+function _ausenciasFail_(error) {
+  return { ok: false, error: error || 'Error desconocido' };
+}
+
+function _ausenciasLogErr_(scope, err) {
+  var msg = '[' + scope + '] ' + (err && err.stack ? err.stack : err);
+  console.error(msg);
 }
 
 function _resolveCurrentUser_() {
