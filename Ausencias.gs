@@ -90,7 +90,7 @@ function getAusencias(params) {
     return _ausenciasOk_(cleanData);
   } catch (e) {
     _ausenciasLogErr_('getAusencias', e);
-    return _ausenciasFail_('Error al consultar ausencias: ' + (e && e.message ? e.message : e));
+    return _ausenciasFail_(e && e.message ? e.message : String(e));
   }
 }
 
@@ -133,11 +133,11 @@ function createAusencia(data) {
     var personaAusente = (payload.personaAusente || '').toString().trim();
     var fechaInicio = _parseDateValue_(payload.fechaInicio);
     var fechaFin = _parseDateValue_(payload.fechaFin);
-    if (!personaAusente) return fail('personaAusente es obligatoria.');
+    if (!personaAusente) return _ausenciasFail_('personaAusente es obligatoria.');
     if (!fechaInicio || !fechaFin) {
-      return fail('fechaInicio o fechaFin no tiene formato válido');
+      return _ausenciasFail_('fechaInicio o fechaFin no tiene formato válido');
     }
-    if (fechaFin.getTime() < fechaInicio.getTime()) return fail('fechaFin no puede ser anterior a fechaInicio.');
+    if (fechaFin.getTime() < fechaInicio.getTime()) return _ausenciasFail_('fechaFin no puede ser anterior a fechaInicio.');
 
     var now = new Date();
     var id = Utilities.getUuid();
@@ -158,7 +158,6 @@ function createAusencia(data) {
     };
 
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(AUSENCIAS_SHEET_NAME);
-    var headerMap = _getAusenciasHeaderMap_(sheet);
     var row = AUSENCIAS_HEADERS.map(function(h) { return record[h] !== undefined ? record[h] : ''; });
 
     var writeRow = [];
@@ -169,10 +168,10 @@ function createAusencia(data) {
     }
 
     sheet.appendRow(writeRow);
-    return ok(record);
+    return _ausenciasOk_(record, 'Ausencia guardada correctamente');
   } catch (e) {
-    logErr('createAusencia', e);
-    return fail('Error al crear la ausencia: ' + e.message);
+    _ausenciasLogErr_('createAusencia', e);
+    return _ausenciasFail_(e && e.message ? e.message : String(e));
   }
 }
 

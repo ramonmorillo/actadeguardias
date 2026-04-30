@@ -1800,6 +1800,7 @@ function cargarUsuariosAusencias(onLoaded) {
 }
 
 function cargarAusencias() {
+  console.log('[Ausencias] inicializando módulo');
   var filtros = {
     estado: document.getElementById('aus-f-estado').value || '',
     personaAusente: document.getElementById('aus-f-persona').value || '',
@@ -1811,29 +1812,29 @@ function cargarAusencias() {
     .withSuccessHandler(function(res) {
       hideSpinner();
       try {
+        console.log('[Ausencias][backend getAusencias]', res);
         if (!res || res.ok === false) {
-          console.error('[Ausencias][backend getAusencias]', res);
           toast((res && res.error) ? res.error : 'No se pudieron cargar las ausencias', 'danger');
-          renderTablaAusencias([]);
+          renderAusencias([]);
           return;
         }
-        renderTablaAusencias(Array.isArray(res.data) ? res.data : []);
+        renderAusencias(Array.isArray(res.data) ? res.data : []);
       } catch (e) {
         console.error('[Ausencias][getAusencias successHandler]', e);
-        renderTablaAusencias([]);
+        renderAusencias([]);
         toast('Error al pintar las ausencias', 'danger');
       }
     })
     .withFailureHandler(function(err) {
       hideSpinner();
-      console.error('[Ausencias][backend getAusencias]', err);
-      renderTablaAusencias([]);
-      toast('Error al ejecutar getAusencias: ' + ((err && err.message) ? err.message : err), 'danger');
+      console.error('[Ausencias][getAusencias error]', err);
+      toast('No se pudieron cargar las ausencias', 'danger');
+      renderAusencias([]);
     })
     .getAusencias(filtros);
 }
 
-function renderTablaAusencias(lista) {
+function renderAusencias(lista) {
   var body = document.getElementById('aus-body');
   var rows = Array.isArray(lista) ? lista : [];
   APP.ausenciasRows = rows;
@@ -1860,6 +1861,10 @@ function renderTablaAusencias(lista) {
     console.error('[Ausencias][renderAusencias]', e);
     body.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">Sin datos</td></tr>';
   }
+}
+
+function renderTablaAusencias(lista) {
+  renderAusencias(lista);
 }
 
 function guardarAusencia(event) {
@@ -1913,7 +1918,7 @@ function guardarAusencia(event) {
           toast((resp && resp.error) ? resp.error : 'No se pudo guardar la ausencia', 'danger');
           return;
         }
-        toast('Ausencia guardada', 'success');
+        toast((resp && resp.message) ? resp.message : 'Ausencia guardada', 'success');
         limpiarFormularioAusencias();
         cargarAusencias();
       })
@@ -1934,7 +1939,7 @@ function guardarAusencia(event) {
         toast((resp && resp.error) ? resp.error : 'No se pudo guardar la ausencia', 'danger');
         return;
       }
-      toast('Ausencia guardada', 'success');
+      toast((resp && resp.message) ? resp.message : 'Ausencia guardada', 'success');
       limpiarFormularioAusencias();
       cargarAusencias();
     })
