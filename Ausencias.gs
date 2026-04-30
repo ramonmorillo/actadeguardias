@@ -53,6 +53,7 @@ function ensureAusenciasSheet() {
 }
 
 function getAusencias(params) {
+  Logger.log('[Ausencias][getAusencias] inicio params=%s', JSON.stringify(params || {}));
   try {
     var ensured = ensureAusenciasSheet();
     if (!ensured.ok) return ensured;
@@ -87,8 +88,11 @@ function getAusencias(params) {
       });
       return out;
     });
-    return _ausenciasOk_(cleanData);
+    var response = _ausenciasOk_(cleanData);
+    Logger.log('[Ausencias][getAusencias] retorno ok total=%s', cleanData.length);
+    return response;
   } catch (e) {
+    Logger.log('[Ausencias][getAusencias] error=%s', e && e.stack ? e.stack : e);
     _ausenciasLogErr_('getAusencias', e);
     return _ausenciasFail_(e && e.message ? e.message : String(e));
   }
@@ -125,6 +129,8 @@ function getAusenciasPorRango(fechaDesde, fechaHasta) {
 }
 
 function createAusencia(data) {
+  Logger.log('[Ausencias][createAusencia] inicio');
+  Logger.log('[Ausencias][createAusencia] payload=%s', JSON.stringify(data || {}));
   try {
     var ensured = ensureAusenciasSheet();
     if (!ensured.ok) return ensured;
@@ -140,7 +146,7 @@ function createAusencia(data) {
     if (fechaFin.getTime() < fechaInicio.getTime()) return _ausenciasFail_('fechaFin no puede ser anterior a fechaInicio.');
 
     var now = new Date();
-    var id = Utilities.getUuid();
+    var id = (payload.id || '').toString().trim() || Utilities.getUuid();
     var creadoPor = _resolveCurrentUser_();
 
     var record = {
@@ -168,11 +174,31 @@ function createAusencia(data) {
     }
 
     sheet.appendRow(writeRow);
+    Logger.log('[Ausencias][createAusencia] fila guardada id=%s', id);
     return _ausenciasOk_(record, 'Ausencia guardada correctamente');
   } catch (e) {
+    Logger.log('[Ausencias][createAusencia] error=%s', e && e.stack ? e.stack : e);
     _ausenciasLogErr_('createAusencia', e);
     return _ausenciasFail_(e && e.message ? e.message : String(e));
   }
+}
+
+function testAusenciasBackend() {
+  var payload = {
+    personaAusente: 'TEST',
+    fechaInicio: '2026-04-30',
+    fechaFin: '2026-05-01',
+    tipoAusencia: 'TEST',
+    sustituto: '',
+    observaciones: 'Prueba backend'
+  };
+  var created = createAusencia(payload);
+  var list = getAusencias({});
+  return {
+    ok: true,
+    created: created,
+    list: list
+  };
 }
 
 function updateAusencia(id, data) {
