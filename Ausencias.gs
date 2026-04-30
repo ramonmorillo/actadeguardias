@@ -16,6 +16,10 @@ var AUSENCIAS_HEADERS = [
   'createdAt',
   'updatedAt'
 ];
+function pingAusencias() {
+  return 'PING_AUSENCIAS_FIX_20260430_' + new Date().toISOString();
+}
+
 
 
 function _ausenciasToClient_(obj) {

@@ -1801,6 +1801,14 @@ function cargarUsuariosAusencias(onLoaded) {
 
 function cargarAusencias() {
   console.log('[Ausencias] inicializando módulo');
+  google.script.run
+    .withSuccessHandler(function(resp) {
+      console.log('[Ausencias][PING backend]', resp, typeof resp);
+    })
+    .withFailureHandler(function(err) {
+      console.error('[Ausencias][PING error]', err);
+    })
+    .pingAusencias();
   var filtros = {
     estado: document.getElementById('aus-f-estado').value || '',
     personaAusente: document.getElementById('aus-f-persona').value || '',
