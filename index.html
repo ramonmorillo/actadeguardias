@@ -876,11 +876,11 @@
       <div class="card-body">
         <input type="hidden" id="aus-id">
         <div class="row g-2">
-          <div class="col-sm-4"><label class="form-label">Persona ausente *</label><select class="form-select" id="aus-persona-ausente"><option value="">Seleccionar...</option></select><input type="text" class="form-control mt-1" id="aus-persona-ausente-manual" style="display:none;" placeholder="Persona ausente"></div>
+          <div class="col-sm-4"><label class="form-label">Persona ausente *</label><select id="ausenciaPersonaAusente" class="form-select" required><option value="">Seleccionar...</option></select></div>
           <div class="col-sm-2"><label class="form-label">Fecha inicio *</label><input type="date" class="form-control" id="aus-fecha-inicio"></div>
           <div class="col-sm-2"><label class="form-label">Fecha fin *</label><input type="date" class="form-control" id="aus-fecha-fin"></div>
           <div class="col-sm-2"><label class="form-label">Tipo ausencia</label><input type="text" class="form-control" id="aus-tipo"></div>
-          <div class="col-sm-2"><label class="form-label">Sustituta/o</label><select class="form-select" id="aus-persona-sustituta"><option value="">Seleccionar...</option></select><input type="text" class="form-control mt-1" id="aus-persona-sustituta-manual" style="display:none;" placeholder="Sustituta/o"></div>
+          <div class="col-sm-2"><label class="form-label">Sustituta/o</label><select id="ausenciaPersonaSustituta" class="form-select"><option value="">Sin sustituto/a asignado/a</option></select></div>
           <div class="col-12"><label class="form-label">Observaciones</label><textarea class="form-control" id="aus-observaciones" rows="2"></textarea></div>
           <div class="col-12 d-flex gap-2 justify-content-end">
             <button class="btn btn-outline-secondary" onclick="limpiarFormularioAusencias()">Limpiar</button>
@@ -1397,7 +1397,7 @@ function showView(viewId) {
   else if (viewId === 'busqueda')     initBusqueda();
   else if (viewId === 'informes')     initInformes();
   else if (viewId === 'estadisticas') cargarEstadisticas();
-  else if (viewId === 'ausencias')    { cargarUsuariosParaAusencias(); cargarAusencias(); }
+  else if (viewId === 'ausencias')    { cargarUsuariosAusencias(); cargarAusencias(); }
   else if (viewId === 'usuarios')     cargarUsuarios();
   else if (viewId === 'catalogos')    cargarCatalogosAdmin();
 }
@@ -1754,43 +1754,49 @@ function poblarSelectoresCatalogos() {
   llenarSelect('inc-filtro-area', areas);
 }
 
-function cargarUsuariosParaAusencias() {
-  llamar('getUsuariosParaAusencias', [], null, function(usuarios) {
-    poblarSelectUsuariosAusencias(usuarios || []);
-    setModoManualAusencias(false);
-  }, function() {
-    setModoManualAusencias(true);
-    toast('No se pudo cargar el listado de usuarios. Se mantiene entrada manual.', 'warning');
-  });
-}
+function cargarUsuariosAusencias(onLoaded) {
+  var ausente = document.getElementById('ausenciaPersonaAusente');
+  var sustituta = document.getElementById('ausenciaPersonaSustituta');
+  if (!ausente || !sustituta) {
+    if (typeof onLoaded === 'function') onLoaded();
+    return;
+  }
+  google.script.run
+    .withSuccessHandler(function(result) {
+      var baseAusente = '<option value="">Seleccionar...</option>';
+      var baseSustituta = '<option value="">Sin sustituto/a asignado/a</option>';
+      ausente.innerHTML = baseAusente;
+      sustituta.innerHTML = baseSustituta;
 
-function poblarSelectUsuariosAusencias(usuarios) {
-  var ausente = document.getElementById('aus-persona-ausente');
-  var sustituta = document.getElementById('aus-persona-sustituta');
-  var base = '<option value="">Seleccionar...</option>';
-  var opts = (usuarios || []).map(function(u) {
-    var nombre = (u && u.nombre ? u.nombre : '').toString();
-    return nombre ? '<option value="' + escHtml(nombre) + '">' + escHtml(nombre) + '</option>' : '';
-  }).join('');
-  ausente.innerHTML = base + opts;
-  sustituta.innerHTML = base + opts;
-}
+      if (!result || result.ok !== true) {
+        toast((result && result.error) ? result.error : 'No se pudo cargar el listado de usuarios para ausencias.', 'warning');
+        if (typeof onLoaded === 'function') onLoaded();
+        return;
+      }
 
-function setModoManualAusencias(manual) {
-  document.getElementById('aus-persona-ausente').style.display = manual ? 'none' : '';
-  document.getElementById('aus-persona-sustituta').style.display = manual ? 'none' : '';
-  document.getElementById('aus-persona-ausente-manual').style.display = manual ? '' : 'none';
-  document.getElementById('aus-persona-sustituta-manual').style.display = manual ? '' : 'none';
-}
-
-function valorPersonaAusenteFormulario() {
-  var manual = document.getElementById('aus-persona-ausente-manual').style.display !== 'none';
-  return manual ? document.getElementById('aus-persona-ausente-manual').value.trim() : (document.getElementById('aus-persona-ausente').value || '').trim();
-}
-
-function valorPersonaSustitutaFormulario() {
-  var manual = document.getElementById('aus-persona-sustituta-manual').style.display !== 'none';
-  return manual ? document.getElementById('aus-persona-sustituta-manual').value.trim() : (document.getElementById('aus-persona-sustituta').value || '').trim();
+      var unique = {};
+      (result.data || []).forEach(function(item) {
+        var nombre = (item && item.nombre ? item.nombre : '').toString().trim();
+        if (!nombre || unique[nombre]) return;
+        unique[nombre] = true;
+        var o1 = document.createElement('option');
+        o1.value = nombre;
+        o1.textContent = nombre;
+        ausente.appendChild(o1);
+        var o2 = document.createElement('option');
+        o2.value = nombre;
+        o2.textContent = nombre;
+        sustituta.appendChild(o2);
+      });
+      if (typeof onLoaded === 'function') onLoaded();
+    })
+    .withFailureHandler(function(err) {
+      ausente.innerHTML = '<option value="">Seleccionar...</option>';
+      sustituta.innerHTML = '<option value="">Sin sustituto/a asignado/a</option>';
+      toast('No se pudo cargar el listado de usuarios para ausencias: ' + ((err && err.message) || 'error inesperado'), 'warning');
+      if (typeof onLoaded === 'function') onLoaded();
+    })
+    .getUsuariosParaAusencias();
 }
 
 function cargarAusencias() {
@@ -1830,12 +1836,17 @@ function renderTablaAusencias(rows) {
 
 function guardarAusencia() {
   var id = document.getElementById('aus-id').value;
+  var personaAusente = document.getElementById('ausenciaPersonaAusente').value.trim();
+  if (!personaAusente) {
+    toast('La persona ausente es obligatoria.', 'warning');
+    return;
+  }
   var payload = {
-    personaAusente: valorPersonaAusenteFormulario(),
+    personaAusente: personaAusente,
     fechaInicio: document.getElementById('aus-fecha-inicio').value,
     fechaFin: document.getElementById('aus-fecha-fin').value,
     tipoAusencia: document.getElementById('aus-tipo').value.trim(),
-    personaSustituta: valorPersonaSustitutaFormulario(),
+    personaSustituta: document.getElementById('ausenciaPersonaSustituta').value.trim(),
     observaciones: document.getElementById('aus-observaciones').value.trim()
   };
   var fn = id ? 'updateAusencia' : 'createAusencia';
@@ -1850,16 +1861,16 @@ function guardarAusencia() {
 function editarAusencia(id) {
   var row = (APP.ausenciasRows || []).find(function(r) { return r.id === id; });
   if (!row) return;
-  document.getElementById('aus-id').value = row.id || '';
-  document.getElementById('aus-persona-ausente').value = row.personaAusente || '';
-  document.getElementById('aus-persona-ausente-manual').value = row.personaAusente || '';
-  document.getElementById('aus-fecha-inicio').value = toInputDate(row.fechaInicio);
-  document.getElementById('aus-fecha-fin').value = toInputDate(row.fechaFin);
-  document.getElementById('aus-tipo').value = row.tipoAusencia || '';
-  document.getElementById('aus-persona-sustituta').value = row.personaSustituta || '';
-  document.getElementById('aus-persona-sustituta-manual').value = row.personaSustituta || '';
-  document.getElementById('aus-observaciones').value = row.observaciones || '';
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  cargarUsuariosAusencias(function() {
+    document.getElementById('aus-id').value = row.id || '';
+    document.getElementById('ausenciaPersonaAusente').value = row.personaAusente || '';
+    document.getElementById('aus-fecha-inicio').value = toInputDate(row.fechaInicio);
+    document.getElementById('aus-fecha-fin').value = toInputDate(row.fechaFin);
+    document.getElementById('aus-tipo').value = row.tipoAusencia || '';
+    document.getElementById('ausenciaPersonaSustituta').value = row.personaSustituta || '';
+    document.getElementById('aus-observaciones').value = row.observaciones || '';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
 }
 
 function cancelarAusencia(id) {
@@ -1872,7 +1883,7 @@ function cancelarAusencia(id) {
 }
 
 function limpiarFormularioAusencias() {
-  ['aus-id','aus-persona-ausente','aus-persona-ausente-manual','aus-fecha-inicio','aus-fecha-fin','aus-tipo','aus-persona-sustituta','aus-persona-sustituta-manual','aus-observaciones'].forEach(function(id){ document.getElementById(id).value = ''; });
+  ['aus-id','ausenciaPersonaAusente','aus-fecha-inicio','aus-fecha-fin','aus-tipo','ausenciaPersonaSustituta','aus-observaciones'].forEach(function(id){ document.getElementById(id).value = ''; });
 }
 
 function limpiarFiltrosAusencias() {
