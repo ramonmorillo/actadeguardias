@@ -884,7 +884,7 @@
           <div class="col-12"><label class="form-label">Observaciones</label><textarea class="form-control" id="aus-observaciones" rows="2"></textarea></div>
           <div class="col-12 d-flex gap-2 justify-content-end">
             <button class="btn btn-outline-secondary" onclick="limpiarFormularioAusencias()">Limpiar</button>
-            <button class="btn btn-primary" onclick="guardarAusencia()"><i class="bi bi-floppy me-1"></i>Guardar</button>
+            <button id="aus-btn-guardar" type="button" class="btn btn-primary" onclick="guardarAusencia(event)"><i class="bi bi-floppy me-1"></i>Guardar</button>
           </div>
         </div>
       </div>
@@ -1862,27 +1862,44 @@ function renderTablaAusencias(lista) {
   }
 }
 
-function guardarAusencia() {
+function guardarAusencia(event) {
+  if (event && typeof event.preventDefault === 'function') event.preventDefault();
+
   var id = document.getElementById('aus-id').value;
   var personaAusente = document.getElementById('ausenciaPersonaAusente').value.trim();
+  var fechaInicio = document.getElementById('aus-fecha-inicio').value;
+  var fechaFin = document.getElementById('aus-fecha-fin').value;
+
   if (!personaAusente) {
     toast('La persona ausente es obligatoria.', 'warning');
     return;
   }
+  if (!fechaInicio) {
+    toast('La fecha de inicio es obligatoria.', 'warning');
+    return;
+  }
+  if (!fechaFin) {
+    toast('La fecha de fin es obligatoria.', 'warning');
+    return;
+  }
+
   var payload = {
     personaAusente: personaAusente,
-    fechaInicio: document.getElementById('aus-fecha-inicio').value,
-    fechaFin: document.getElementById('aus-fecha-fin').value,
+    fechaInicio: fechaInicio,
+    fechaFin: fechaFin,
     tipoAusencia: document.getElementById('aus-tipo').value.trim(),
     personaSustituta: document.getElementById('ausenciaPersonaSustituta').value.trim(),
     observaciones: document.getElementById('aus-observaciones').value.trim()
   };
-  var fn = id ? 'updateAusencia' : 'createAusencia';
+  console.log('[Ausencias][payload]', payload);
+
   mostrarCargando('Guardando ausencia…');
-  var runner = google.script.run
-    .withSuccessHandler(function(res) {
-      ocultarCargando();
-      try {
+
+  if (id) {
+    google.script.run
+      .withSuccessHandler(function(res) {
+        ocultarCargando();
+        console.log('[Ausencias][updateAusencia response]', res);
         if (!res || res.ok === false) {
           toast((res && res.error) ? res.error : 'No se pudo guardar la ausencia', 'danger');
           return;
@@ -1890,22 +1907,34 @@ function guardarAusencia() {
         toast('Ausencia guardada', 'success');
         limpiarFormularioAusencias();
         cargarAusencias();
-      } catch (e) {
-        console.error('[Ausencias][guardar successHandler]', e);
-        toast('La ausencia se guardó, pero no se pudo actualizar la tabla. Recarga la página.', 'warning');
+      })
+      .withFailureHandler(function(err) {
+        ocultarCargando();
+        console.error('[Ausencias][updateAusencia failure]', err);
+        toast('Error al ejecutar updateAusencia: ' + (err && err.message ? err.message : err), 'danger');
+      })
+      .updateAusencia(id, payload);
+    return;
+  }
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      ocultarCargando();
+      console.log('[Ausencias][createAusencia response]', res);
+      if (!res || res.ok === false) {
+        toast((res && res.error) ? res.error : 'No se pudo guardar la ausencia', 'danger');
+        return;
       }
+      toast('Ausencia guardada', 'success');
+      limpiarFormularioAusencias();
+      cargarAusencias();
     })
     .withFailureHandler(function(err) {
       ocultarCargando();
-      console.error(id ? '[Ausencias][backend updateAusencia]' : '[Ausencias][backend createAusencia]', err);
-      toast('Error al ejecutar ' + fn + ': ' + ((err && err.message) ? err.message : err), 'danger');
-    });
-
-  if (id) {
-    runner.updateAusencia(id, payload);
-  } else {
-    runner.createAusencia(payload);
-  }
+      console.error('[Ausencias][createAusencia failure]', err);
+      toast('Error al ejecutar createAusencia: ' + (err && err.message ? err.message : err), 'danger');
+    })
+    .createAusencia(payload);
 }
 
 function editarAusencia(id) {
