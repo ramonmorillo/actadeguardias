@@ -1806,18 +1806,43 @@ function cargarAusencias() {
     fechaDesde: document.getElementById('aus-f-desde').value || '',
     fechaHasta: document.getElementById('aus-f-hasta').value || ''
   };
-  llamar('getAusencias', [filtros], 'Cargando ausencias…', function(data) {
-    renderTablaAusencias(data || []);
-  });
+  mostrarCargando('Cargando ausencias…');
+  var runner = google.script.run
+    .withSuccessHandler(function(res) {
+      ocultarCargando();
+      try {
+        if (!res || res.ok === false) {
+          console.error('[Ausencias][backend getAusencias]', res);
+          toast((res && res.error) ? res.error : 'No se pudieron cargar las ausencias', 'danger');
+          renderTablaAusencias([]);
+          return;
+        }
+        renderTablaAusencias(Array.isArray(res.data) ? res.data : []);
+      } catch (e) {
+        console.error('[Ausencias][getAusencias successHandler]', e);
+        renderTablaAusencias([]);
+        toast('Error al pintar las ausencias', 'danger');
+      }
+    })
+    .withFailureHandler(function(err) {
+      ocultarCargando();
+      console.error('[Ausencias][backend getAusencias]', err);
+      renderTablaAusencias([]);
+      toast('Error al ejecutar getAusencias: ' + ((err && err.message) ? err.message : err), 'danger');
+    })
+    .getAusencias(filtros);
 }
 
-function renderTablaAusencias(rows) {
+function renderTablaAusencias(lista) {
   var body = document.getElementById('aus-body');
+  var rows = Array.isArray(lista) ? lista : [];
+  APP.ausenciasRows = rows;
   if (!rows.length) {
-    body.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">Sin ausencias registradas</td></tr>';
+    body.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">Sin datos</td></tr>';
     return;
   }
-  body.innerHTML = rows.map(function(r) {
+  try {
+    body.innerHTML = rows.map(function(r) {
     return '<tr>' +
       '<td>' + escHtml(r.personaAusente || '—') + '</td>' +
       '<td>' + fmtD(r.fechaInicio) + '</td>' +
@@ -1831,7 +1856,10 @@ function renderTablaAusencias(rows) {
       '<button class="btn btn-outline-danger" onclick="cancelarAusencia(' + "'" + escJs(r.id || '') + "'" + ')"><i class="bi bi-x-circle"></i></button>' +
       '</div></td></tr>';
   }).join('');
-  APP.ausenciasRows = rows;
+  } catch (e) {
+    console.error('[Ausencias][renderAusencias]', e);
+    body.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">Sin datos</td></tr>';
+  }
 }
 
 function guardarAusencia() {
@@ -1850,12 +1878,34 @@ function guardarAusencia() {
     observaciones: document.getElementById('aus-observaciones').value.trim()
   };
   var fn = id ? 'updateAusencia' : 'createAusencia';
-  var args = id ? [id, payload] : [payload];
-  llamar(fn, args, 'Guardando ausencia…', function() {
-    toast('Ausencia guardada correctamente.', 'success');
-    limpiarFormularioAusencias();
-    cargarAusencias();
-  });
+  mostrarCargando('Guardando ausencia…');
+  var runner = google.script.run
+    .withSuccessHandler(function(res) {
+      ocultarCargando();
+      try {
+        if (!res || res.ok === false) {
+          toast((res && res.error) ? res.error : 'No se pudo guardar la ausencia', 'danger');
+          return;
+        }
+        toast('Ausencia guardada', 'success');
+        limpiarFormularioAusencias();
+        cargarAusencias();
+      } catch (e) {
+        console.error('[Ausencias][guardar successHandler]', e);
+        toast('La ausencia se guardó, pero no se pudo actualizar la tabla. Recarga la página.', 'warning');
+      }
+    })
+    .withFailureHandler(function(err) {
+      ocultarCargando();
+      console.error(id ? '[Ausencias][backend updateAusencia]' : '[Ausencias][backend createAusencia]', err);
+      toast('Error al ejecutar ' + fn + ': ' + ((err && err.message) ? err.message : err), 'danger');
+    });
+
+  if (id) {
+    runner.updateAusencia(id, payload);
+  } else {
+    runner.createAusencia(payload);
+  }
 }
 
 function editarAusencia(id) {
