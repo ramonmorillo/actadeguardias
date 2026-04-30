@@ -21,6 +21,163 @@ function pingAusencias() {
 }
 
 
+function ausenciasClientJson_(obj) {
+  return JSON.stringify(obj, function(key, value) {
+    if (value instanceof Date) return value.toISOString();
+    return value;
+  });
+}
+
+function ausenciasCreateClient(payload) {
+  try {
+    Logger.log('[ausenciasCreateClient] payload: ' + JSON.stringify(payload));
+
+    if (!payload) throw new Error('Payload vacío');
+    if (!payload.personaAusente) throw new Error('Persona ausente obligatoria');
+    if (!payload.fechaInicio) throw new Error('Fecha inicio obligatoria');
+    if (!payload.fechaFin) throw new Error('Fecha fin obligatoria');
+
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName('Ausencias');
+
+    if (!sheet) {
+      sheet = ss.insertSheet('Ausencias');
+      sheet.appendRow([
+        'id',
+        'personaAusente',
+        'fechaInicio',
+        'fechaFin',
+        'tipoAusencia',
+        'personaSustituta',
+        'observaciones',
+        'estado',
+        'creadoPor',
+        'createdAt',
+        'updatedAt'
+      ]);
+    }
+
+    var now = new Date();
+    var ausencia = {
+      id: Utilities.getUuid(),
+      personaAusente: payload.personaAusente || '',
+      fechaInicio: payload.fechaInicio || '',
+      fechaFin: payload.fechaFin || '',
+      tipoAusencia: payload.tipoAusencia || '',
+      personaSustituta: payload.personaSustituta || payload.sustituto || '',
+      sustituto: payload.personaSustituta || payload.sustituto || '',
+      observaciones: payload.observaciones || '',
+      estado: 'activa',
+      creadoPor: Session.getActiveUser().getEmail() || 'script-admin',
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString()
+    };
+
+    sheet.appendRow([
+      ausencia.id,
+      ausencia.personaAusente,
+      ausencia.fechaInicio,
+      ausencia.fechaFin,
+      ausencia.tipoAusencia,
+      ausencia.personaSustituta,
+      ausencia.observaciones,
+      ausencia.estado,
+      ausencia.creadoPor,
+      ausencia.createdAt,
+      ausencia.updatedAt
+    ]);
+
+    return ausenciasClientJson_({
+      ok: true,
+      success: true,
+      source: 'ausenciasCreateClient_DIRECT_JSON_20260430',
+      data: ausencia,
+      error: null,
+      message: 'Ausencia guardada correctamente'
+    });
+
+  } catch (error) {
+    return ausenciasClientJson_({
+      ok: false,
+      success: false,
+      source: 'ausenciasCreateClient_DIRECT_JSON_20260430',
+      data: null,
+      error: String(error && error.message ? error.message : error),
+      message: ''
+    });
+  }
+}
+
+function ausenciasListClient(filtros) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName('Ausencias');
+
+    if (!sheet) {
+      return ausenciasClientJson_({
+        ok: true,
+        success: true,
+        source: 'ausenciasListClient_DIRECT_JSON_20260430',
+        data: [],
+        error: null,
+        message: 'Sin hoja Ausencias'
+      });
+    }
+
+    var values = sheet.getDataRange().getDisplayValues();
+
+    if (!values || values.length <= 1) {
+      return ausenciasClientJson_({
+        ok: true,
+        success: true,
+        source: 'ausenciasListClient_DIRECT_JSON_20260430',
+        data: [],
+        error: null,
+        message: 'Sin ausencias registradas'
+      });
+    }
+
+    var headers = values[0];
+    var rows = values.slice(1).filter(function(row) {
+      return row.some(function(cell) {
+        return String(cell || '').trim() !== '';
+      });
+    });
+
+    var data = rows.map(function(row) {
+      var obj = {};
+      headers.forEach(function(header, i) {
+        obj[header] = row[i] || '';
+      });
+
+      obj.sustituto = obj.personaSustituta || obj.sustituto || '';
+      obj.personaSustituta = obj.personaSustituta || obj.sustituto || '';
+
+      return obj;
+    });
+
+    return ausenciasClientJson_({
+      ok: true,
+      success: true,
+      source: 'ausenciasListClient_DIRECT_JSON_20260430',
+      data: data,
+      error: null,
+      message: 'Ausencias cargadas correctamente'
+    });
+
+  } catch (error) {
+    return ausenciasClientJson_({
+      ok: false,
+      success: false,
+      source: 'ausenciasListClient_DIRECT_JSON_20260430',
+      data: [],
+      error: String(error && error.message ? error.message : error),
+      message: ''
+    });
+  }
+}
+
+
 
 function _ausenciasToClient_(obj) {
   return JSON.parse(JSON.stringify(_ausenciasNormalizeForClient_(obj)));
