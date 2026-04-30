@@ -17,6 +17,40 @@ var AUSENCIAS_HEADERS = [
   'updatedAt'
 ];
 
+
+function _ausenciasToClient_(obj) {
+  return JSON.parse(JSON.stringify(_ausenciasNormalizeForClient_(obj)));
+}
+
+function _ausenciasNormalizeForClient_(value) {
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  if (Array.isArray(value)) {
+    return value.map(function(item) { return _ausenciasNormalizeForClient_(item); });
+  }
+  if (value && typeof value === 'object') {
+    var normalized = {};
+    Object.keys(value).forEach(function(key) {
+      normalized[key] = _ausenciasNormalizeForClient_(value[key]);
+    });
+
+    ['fechaInicio', 'fechaFin', 'createdAt', 'updatedAt'].forEach(function(field) {
+      if (normalized[field] instanceof Date) {
+        normalized[field] = normalized[field].toISOString();
+      }
+    });
+
+    if (Object.prototype.hasOwnProperty.call(normalized, 'personaSustituta') || Object.prototype.hasOwnProperty.call(normalized, 'sustituto')) {
+      var sustituto = normalized.personaSustituta || normalized.sustituto || '';
+      normalized.sustituto = sustituto;
+      normalized.personaSustituta = sustituto;
+    }
+    return normalized;
+  }
+  return value;
+}
+
 function ensureAusenciasSheet() {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -60,23 +94,27 @@ function getAusencias(filtros) {
     var sheet = ss.getSheetByName('Ausencias');
 
     if (!sheet) {
-      return {
+      return _ausenciasToClient_({
         ok: true,
+        success: true,
         source: 'getAusencias_VERSION_FIX_20260430',
         data: [],
+        error: null,
         message: 'Sin ausencias registradas'
-      };
+      });
     }
 
     var values = sheet.getDataRange().getValues();
 
     if (!values || values.length <= 1) {
-      return {
+      return _ausenciasToClient_({
         ok: true,
+        success: true,
         source: 'getAusencias_VERSION_FIX_20260430',
         data: [],
+        error: null,
         message: 'Sin ausencias registradas'
-      };
+      });
     }
 
     var headers = values[0];
@@ -87,23 +125,34 @@ function getAusencias(filtros) {
       headers.forEach(function(header, index) {
         obj[header] = row[index];
       });
+      var sustituto = obj.personaSustituta || obj.sustituto || '';
+      obj.sustituto = sustituto;
+      obj.personaSustituta = sustituto;
+      ['fechaInicio', 'fechaFin', 'createdAt', 'updatedAt'].forEach(function(field) {
+        if (obj[field] instanceof Date) obj[field] = obj[field].toISOString();
+      });
       return obj;
     });
 
-    return {
+    return _ausenciasToClient_({
       ok: true,
+      success: true,
       source: 'getAusencias_VERSION_FIX_20260430',
-      data: data,
+      data: data || [],
+      error: null,
       message: 'Ausencias cargadas correctamente'
-    };
+    });
   } catch (error) {
     Logger.log('[Ausencias][getAusencias][ERROR] ' + String(error && error.message ? error.message : error));
 
-    return {
+    return _ausenciasToClient_({
       ok: false,
+      success: false,
       source: 'getAusencias_VERSION_FIX_20260430',
-      error: String(error && error.message ? error.message : error)
-    };
+      data: null,
+      error: String(error && error.message ? error.message : error),
+      message: ''
+    });
   }
 }
 
@@ -130,11 +179,11 @@ function diagnosticoAusencias() {
 }
 
 function getAusenciasActivas() {
-  return getAusencias({ estado: 'activa' });
+  return _ausenciasToClient_(getAusencias({ estado: 'activa' }));
 }
 
 function getAusenciasPorRango(fechaDesde, fechaHasta) {
-  return getAusencias({ fechaDesde: fechaDesde, fechaHasta: fechaHasta });
+  return _ausenciasToClient_(getAusencias({ fechaDesde: fechaDesde, fechaHasta: fechaHasta }));
 }
 
 function createAusencia(payload) {
@@ -203,20 +252,25 @@ function createAusencia(payload) {
       ausencia.updatedAt
     ]);
 
-    return {
+    return _ausenciasToClient_({
       ok: true,
+      success: true,
       source: 'createAusencia_VERSION_FIX_20260430',
       data: ausencia,
+      error: null,
       message: 'Ausencia guardada correctamente'
-    };
+    });
   } catch (error) {
     Logger.log('[Ausencias][createAusencia][ERROR] ' + String(error && error.message ? error.message : error));
 
-    return {
+    return _ausenciasToClient_({
       ok: false,
+      success: false,
       source: 'createAusencia_VERSION_FIX_20260430',
-      error: String(error && error.message ? error.message : error)
-    };
+      data: null,
+      error: String(error && error.message ? error.message : error),
+      message: ''
+    });
   }
 }
 
