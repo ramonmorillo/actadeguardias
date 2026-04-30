@@ -1863,6 +1863,7 @@ function renderAusencias(lista) {
       '<td>' + escHtml(r.estado || '—') + '</td>' +
       '<td>' + escHtml(r.observaciones || '—') + '</td>' +
       '<td><div class="btn-group btn-group-sm">' +
+      '<button class="btn btn-outline-secondary" onclick="imprimirAusencia(' + "'" + escJs(r.id || '') + "'" + ')">Imprimir</button>' +
       '<button class="btn btn-outline-primary" onclick="editarAusencia(' + "'" + escJs(r.id || '') + "'" + ')"><i class="bi bi-pencil"></i></button>' +
       '<button class="btn btn-outline-danger" onclick="cancelarAusencia(' + "'" + escJs(r.id || '') + "'" + ')"><i class="bi bi-x-circle"></i></button>' +
       '</div></td></tr>';
@@ -2007,6 +2008,52 @@ function editarAusencia(id) {
     document.getElementById('aus-observaciones').value = row.observaciones || '';
     window.scrollTo({ top: 0, behavior: 'smooth' });
   });
+}
+
+function imprimirAusencia(id) {
+  var row = (APP.ausenciasRows || []).find(function(r) { return r.id === id; });
+  if (!row) {
+    toast('No se encontró la ausencia para imprimir.', 'danger');
+    return;
+  }
+
+  var fechaGeneracion = new Date().toLocaleString('es-ES');
+  var printWindow = window.open('', '_blank', 'width=900,height=700');
+  if (!printWindow) {
+    toast('No se pudo abrir la vista de impresión. Revisa el bloqueador de ventanas emergentes.', 'warning');
+    return;
+  }
+
+  var doc = '' +
+    '<!doctype html><html lang="es"><head><meta charset="utf-8">' +
+    '<title>Registro de ausencia</title>' +
+    '<style>' +
+    'body{font-family:Arial,sans-serif;margin:32px;color:#111;}' +
+    'h1{font-size:24px;margin:0 0 4px 0;}' +
+    'h2{font-size:16px;margin:0 0 22px 0;font-weight:600;color:#444;}' +
+    '.campo{margin:0 0 10px 0;}' +
+    '.label{font-weight:700;display:inline-block;min-width:180px;}' +
+    '.nota{margin-top:28px;font-size:12px;color:#555;}' +
+    '.fecha-gen{margin-top:18px;font-size:12px;color:#444;}' +
+    '</style></head><body>' +
+    '<h1>Registro de ausencia</h1>' +
+    '<h2>Guardias Farmacia</h2>' +
+    '<div class="campo"><span class="label">Persona ausente:</span>' + escHtml(row.personaAusente || '—') + '</div>' +
+    '<div class="campo"><span class="label">Fecha inicio:</span>' + escHtml(fmtD(row.fechaInicio) || '—') + '</div>' +
+    '<div class="campo"><span class="label">Fecha fin:</span>' + escHtml(fmtD(row.fechaFin) || '—') + '</div>' +
+    '<div class="campo"><span class="label">Tipo de ausencia:</span>' + escHtml(row.tipoAusencia || '—') + '</div>' +
+    '<div class="campo"><span class="label">Sustituta/o:</span>' + escHtml(row.personaSustituta || '—') + '</div>' +
+    '<div class="campo"><span class="label">Estado:</span>' + escHtml(row.estado || '—') + '</div>' +
+    '<div class="campo"><span class="label">Observaciones:</span>' + escHtml(row.observaciones || '—') + '</div>' +
+    '<div class="fecha-gen"><strong>Fecha de generación del documento:</strong> ' + escHtml(fechaGeneracion) + '</div>' +
+    '<div class="nota">Documento generado para organización interna del servicio. No contiene datos de pacientes.</div>' +
+    '</body></html>';
+
+  printWindow.document.open();
+  printWindow.document.write(doc);
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
 }
 
 function cancelarAusencia(id) {
