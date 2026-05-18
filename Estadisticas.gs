@@ -7,6 +7,7 @@
  * @param {Object} params  { fechaDesde?, fechaHasta? }
  */
 function getEstadisticas(params) {
+  var t0 = new Date().getTime();
   try {
     var schemaInc = getIncidenciasSchema();
     var schemaPartes;
@@ -90,6 +91,7 @@ function getEstadisticas(params) {
       }
     }
 
+    Logger.log('[Dashboard][Backend] getEstadisticas OK ms=%s total=%s', new Date().getTime() - t0, total);
     return ok({
       total:          total,
       totalPartes:    totalPartes,
@@ -105,6 +107,7 @@ function getEstadisticas(params) {
       evolucionMensual:        mesesArray
     });
   } catch (e) {
+    Logger.log('[Dashboard][Backend] getEstadisticas ERROR ms=%s msg=%s', new Date().getTime() - t0, e && e.message);
     logErr('getEstadisticas', e);
     return fail(e.message);
   }
