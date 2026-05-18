@@ -226,6 +226,7 @@ function listPartes(limit) {
       return new Date(b.fechaCreacion) - new Date(a.fechaCreacion);
     });
     if (limit) partes = partes.slice(0, limit);
+    Logger.log('[Dashboard][Backend] listPartesConConteo OK ms=%s rows=%s', new Date().getTime() - t0, partes.length);
     return ok(partes);
   } catch (e) {
     logErr('listPartes', e);
@@ -238,6 +239,7 @@ function listPartes(limit) {
  * Usa una sola pasada por la hoja de incidencias para evitar N llamadas.
  */
 function listPartesConConteo(limit) {
+  var t0 = new Date().getTime();
   try {
     var schema = getPartesSchema();
     var partesRaw = getAllRaw(CONFIG.SHEETS.PARTES);
@@ -294,8 +296,10 @@ function listPartesConConteo(limit) {
     partes.forEach(function(p) { p.numIncidencias = conteo[p.id] || 0; });
     partes.sort(function(a, b) { return new Date(b.fechaCreacion) - new Date(a.fechaCreacion); });
     if (limit) partes = partes.slice(0, limit);
+    Logger.log('[Dashboard][Backend] listPartesConConteo OK ms=%s rows=%s', new Date().getTime() - t0, partes.length);
     return ok(partes);
   } catch (e) {
+    Logger.log('[Dashboard][Backend] listPartesConConteo ERROR ms=%s msg=%s', new Date().getTime() - t0, e && e.message);
     logErr('listPartesConConteo', e);
     return fail(e.message);
   }

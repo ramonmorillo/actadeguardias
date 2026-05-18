@@ -2119,39 +2119,57 @@ function guardarPassword() {
 //  DASHBOARD
 // ══════════════════════════════════════════════════════
 
+function dashboardCall(fnName, args, onSuccess, onFail) {
+  var started = Date.now();
+  console.log('[Dashboard] Inicio carga:', fnName);
+  return llamar(fnName, args || [], null, function(data, msg) {
+    console.log('[Dashboard] Fin OK:', fnName, (Date.now() - started) + 'ms');
+    if (onSuccess) onSuccess(data, msg);
+  }, function(err) {
+    console.error('[Dashboard] Error en', fnName, err);
+    console.log('[Dashboard] Fin ERROR:', fnName, (Date.now() - started) + 'ms');
+    if (onFail) onFail(err);
+  });
+}
+
 function cargarDashboard() {
   var ahora  = new Date();
   var hace90 = new Date(ahora); hace90.setDate(ahora.getDate() - 90);
   var fmt = function(d){ return d.toISOString().substr(0, 10); };
   var kpiParams = { fechaDesde: fmt(hace90), fechaHasta: fmt(ahora) };
+  console.log('[Dashboard] Inicio carga general');
 
-  llamar('listPartesConConteo', [8], 'Cargando panel…', function(partes) {
+  dashboardCall('listPartesConConteo', [8], function(partes) {
     renderDashPartes(partes);
-  }, function(err) {
-    renderDashPartes([]);
-    console.warn('Dashboard partes:', err);
+  }, function() {
+    document.getElementById('dash-partes-body').innerHTML =
+      '<tr><td colspan="8" class="text-center text-muted py-3">No se pudieron cargar los datos. Reintente o revise ejecuciones de Apps Script.</td></tr>';
   });
-  llamar('getEstadisticas', [kpiParams], null, function(est) {
+
+  dashboardCall('getEstadisticas', [kpiParams], function(est) {
     document.getElementById('kpi-partes').textContent    = est.totalPartes;
     document.getElementById('kpi-abiertas').textContent  = est.abiertas;
     document.getElementById('kpi-criticas').textContent  = est.criticas;
     document.getElementById('kpi-resueltas').textContent = est.resueltas;
-    renderDashIncidencias();
-  }, function(err) {
+  }, function() {
     ['kpi-partes','kpi-abiertas','kpi-criticas','kpi-resueltas'].forEach(function(id) {
       document.getElementById(id).textContent = '—';
     });
-    renderDashIncidencias();
-    console.warn('Dashboard estadísticas:', err);
   });
-  // Pendientes de seguimiento
-  llamar('searchIncidencias', [{ conSeguimiento: true, pageSize: 6, page: 1 }], null,
-    function(res) { renderDashSeguimiento(res.resultados || []); },
-    function(err) {
-      renderDashSeguimiento([]);
-      console.warn('Dashboard seguimiento:', err);
-    }
-  );
+
+  dashboardCall('searchIncidencias', [{ estado:'abierta', pageSize:8, page:1 }], function(res) {
+    renderDashIncidenciasRows((res && res.resultados) || []);
+  }, function() {
+    document.getElementById('dash-incidencias-body').innerHTML =
+      '<tr><td colspan="7" class="text-center text-muted py-3">No se pudieron cargar los datos. Reintente o revise ejecuciones de Apps Script.</td></tr>';
+  });
+
+  dashboardCall('searchIncidencias', [{ conSeguimiento: true, pageSize: 6, page: 1 }], function(res) {
+    renderDashSeguimiento((res && res.resultados) || []);
+  }, function() {
+    document.getElementById('dash-seguimiento-body').innerHTML =
+      '<tr><td colspan="5" class="text-center text-muted py-3">No se pudieron cargar los datos. Reintente o revise ejecuciones de Apps Script.</td></tr>';
+  });
 }
 
 function renderDashPartes(partes) {

@@ -12,6 +12,7 @@
  *   page (default 1), pageSize (default 25)
  */
 function searchIncidencias(filtros) {
+  var t0 = new Date().getTime();
   try {
     var schemaInc = getIncidenciasSchema();
     filtros = filtros || {};
@@ -64,6 +65,7 @@ function searchIncidencias(filtros) {
     var start      = (page - 1) * pageSize;
     var paginated  = resultados.slice(start, start + pageSize);
 
+    Logger.log('[Dashboard][Backend] searchIncidencias OK ms=%s total=%s pageSize=%s', new Date().getTime() - t0, total, pageSize);
     return ok({
       total:          total,
       totalSinFiltros: totalSinFiltros,
@@ -73,6 +75,7 @@ function searchIncidencias(filtros) {
       resultados:     paginated
     });
   } catch (e) {
+    Logger.log('[Dashboard][Backend] searchIncidencias ERROR ms=%s msg=%s', new Date().getTime() - t0, e && e.message);
     logErr('searchIncidencias', e);
     return fail(e.message);
   }
